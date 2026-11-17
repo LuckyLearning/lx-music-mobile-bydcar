@@ -20,6 +20,8 @@
 | 文件 | 改动内容 | 标记 | 冲突处理 |
 | --- | --- | --- | --- |
 | `android/app/src/main/AndroidManifest.xml` | 三七分屏：application/Activity 加 `resizeableActivity=true`、两条 meta-data（`BYD_SUPPORT_SPLIT_ACTIVITY` / `allow_multiple_resumed_activities`）、`configChanges` 补 `density` | XML 注释 `[BYD]` | 上游若改 Manifest，保留这 4 处；上游新增的权限/组件照单全收 |
+| `.github/workflows/release.yml` | 关闭上游自动出包：`on.push` 改为 `workflow_dispatch`，避免按 package.json 版本号抢先建同名 tag/Release 与 `byd-release.yml` 撞车 | YAML 注释 `[BYD]` | 冲突时保留 `workflow_dispatch` 触发方式 |
+| `package.json` | `version`=`0.0.1`、`versionCode`=`1`（车机适配线，与上游 `1.9.x` 解耦） | — | 上游升版本时**保留**本 fork 的 0.0.x，上游 `1.9.x` 只记入基线说明 |
 | `src/types/theme.d.ts` | `ActiveTheme` 交叉 `DesignTokens` 类型 | TS 注释 `[BYD]` | 保留 `& DesignTokens` |
 | `src/utils/pixelRatio.ts` | 追加 `px()`/`sp()`（车机 1920×1080 设计稿换算） | `// [BYD]` 块 | 追加块整体保留，上游函数不动 |
 | `src/store/theme/state.ts` | 初始 state 注入 `NOCTURNE_TOKENS` | `// [BYD]` | 保留 import 与 `...NOCTURNE_TOKENS` |

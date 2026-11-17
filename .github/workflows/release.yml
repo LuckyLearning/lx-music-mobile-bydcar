@@ -1,9 +1,11 @@
 name: Build
 
+# [BYD] 本 fork 关闭上游的自动出包：master 推送不再触发本工作流。
+# 原因：本工作流会按 package.json 版本号自动建 tag/Release，与
+# .github/workflows/byd-release.yml 争同一版本号产物。
+# 需要临时启用时改回 push 触发（或在网页手动 Run workflow）。
 on:
-  push:
-    branches:
-      - master
+  workflow_dispatch:
 
 jobs:
   Android:
