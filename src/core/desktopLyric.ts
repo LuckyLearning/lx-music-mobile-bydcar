@@ -72,7 +72,8 @@ export const showDesktopLyric = async() => {
     bgRadius: setting['desktopLyric.style.bgRadius'],
     borderColor: setting['desktopLyric.style.borderColor'],
     borderWidth: setting['desktopLyric.style.borderWidth'],
-    letterSpacing: setting['desktopLyric.style.letterSpacing'],
+    // 滑块存的是 0-50，原生 letterSpacing 是 em，实时调节走的是 /100
+    letterSpacing: setting['desktopLyric.style.letterSpacing'] / 100,
     bold: setting['desktopLyric.style.bold'],
     hollowStyle: setting['desktopLyric.style.hollowStyle'],
     hollowSize: setting['desktopLyric.style.hollowSize'],

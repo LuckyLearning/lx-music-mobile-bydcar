@@ -27,7 +27,7 @@ export default memo(() => {
     void openUrl('https://github.com/LuckyLearning/lx-music-mobile-bydcar/issues?q=is%3Aissue+')
   }
   const openGHReleasePage = () => {
-    void openUrl('https://github.com/LuckyLearning/Release/tree/main/LxMusic')
+    void openUrl('https://github.com/LuckyLearning/lx-music-mobile-bydcar/releases')
   }
   const openFAQPage = () => {
     void openUrl('https://lyswhut.github.io/lx-music-doc/mobile/faq')

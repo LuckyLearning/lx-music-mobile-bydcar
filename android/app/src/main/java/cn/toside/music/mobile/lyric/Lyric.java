@@ -5,6 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.facebook.react.bridge.Arguments;
@@ -25,6 +27,8 @@ public class Lyric extends LyricPlayer {
   boolean isRunPlayer = false;
   // String lastText = "LX Music ^-^";
   int lastLine = 0;
+  int maxLineNum = 5;
+  final Handler mainHandler = new Handler(Looper.getMainLooper());
   List lines = new ArrayList();
   boolean isShowTranslation;
   boolean isShowRoma;
@@ -115,8 +119,9 @@ public class Lyric extends LyricPlayer {
   private void handleScreenOn() {
     isScreenOff = false;
     if (isDisableAutoPause()) return;
-    if (lyricView == null) lyricView = new LyricView(reactAppContext, lyricEvent);
-    lyricView.runOnUiThread(() -> {
+    // LyricView 并不是真正启动的 Activity，runOnUiThread 的 mHandler 为空会直接 NPE，
+    // 亮屏后歌词就停在屏幕关掉时的那一句。
+    mainHandler.post(() -> {
       handleGetCurrentLyric(lastLine);
       setTempPause(false);
     });
@@ -128,9 +133,9 @@ public class Lyric extends LyricPlayer {
     this.pause();
   }
 
-  private void setCurrentLyric(String lyric, ArrayList<String> extendedLyrics, ArrayList<String> viewExtendedLyrics) {
+  private void setCurrentLyric(String lyric, ArrayList<String> extendedLyrics, ArrayList<String> viewExtendedLyrics, int lineNum) {
     if (isShowLyricView && !isScreenOff && lyricView != null) {
-      lyricView.setLyric(lyric, viewExtendedLyrics);
+      lyricView.setLyric(lyric, viewExtendedLyrics, lineNum);
     }
     if (isSendLyricTextEvent) {
       WritableMap params = Arguments.createMap();
@@ -139,6 +144,39 @@ public class Lyric extends LyricPlayer {
       lyricEvent.sendEvent(lyricEvent.LYRIC_Line_PLAY, params);
     }
   }
+  private static int readInt(Bundle options, String key, int fallback) {
+    if (options == null || !options.containsKey(key)) return fallback;
+    Object value = options.get(key);
+    if (value instanceof Number) return ((Number) value).intValue();
+    return fallback;
+  }
+
+  /**
+   * 悬浮窗要显示的「其它行」。
+   * 有翻译/音译时仍只带这些附属行（蓝牙事件也不受影响）；
+   * 没有时按最大行数补上后续歌词，否则行数设置永远只有当前行+下一行。
+   */
+  private ArrayList<String> buildViewLines(int lineNum, ArrayList<String> extended) {
+    int slots = Math.max(0, maxLineNum - 1);
+    ArrayList<String> viewExtended = new ArrayList<>();
+    if (extended != null && slots > 0) {
+      for (String line : extended) {
+        if (viewExtended.size() >= slots) break;
+        if (line == null || line.isEmpty()) continue;
+        viewExtended.add(line);
+      }
+    }
+    if (viewExtended.isEmpty() && slots > 0) {
+      for (int i = lineNum + 1; i < lines.size() && viewExtended.size() < slots; i++) {
+        HashMap next = (HashMap) lines.get(i);
+        if (next == null) continue;
+        String nextText = (String) next.get("text");
+        if (nextText != null && !nextText.isEmpty()) viewExtended.add(nextText);
+      }
+    }
+    return viewExtended;
+  }
+
   private void handleGetCurrentLyric(int lineNum) {
     lastLine = lineNum;
     if (lineNum >= 0 && lineNum < lines.size()) {
@@ -146,26 +184,11 @@ public class Lyric extends LyricPlayer {
       if (line != null) {
         @SuppressWarnings("unchecked")
         ArrayList<String> extended = (ArrayList<String>) line.get("extendedLyrics");
-        // [BYD] 无翻译/音译时用下一行歌词补位，让"最大行数"设置真正起效
-        // （此前行数>1 时若没有翻译，悬浮窗永远只显示一行）
-        ArrayList<String> viewExtended = extended;
-        if (extended == null || extended.isEmpty()) {
-          if (lineNum + 1 < lines.size()) {
-            HashMap next = (HashMap) lines.get(lineNum + 1);
-            if (next != null) {
-              String nextText = (String) next.get("text");
-              if (nextText != null && !nextText.isEmpty()) {
-                viewExtended = new ArrayList<>(1);
-                viewExtended.add(nextText);
-              }
-            }
-          }
-        }
-        setCurrentLyric((String) line.get("text"), extended, viewExtended);
+        setCurrentLyric((String) line.get("text"), extended, buildViewLines(lineNum, extended), lineNum);
         return;
       }
     }
-    setCurrentLyric("", new ArrayList<>(0), new ArrayList<>(0));
+    setCurrentLyric("", new ArrayList<>(0), new ArrayList<>(0), lineNum);
   }
 
   public void setSendLyricTextEvent(boolean isSend) {
@@ -180,7 +203,11 @@ public class Lyric extends LyricPlayer {
   }
 
   public void showDesktopLyric(Bundle options, Promise promise) {
-    if (isShowLyricView) return;
+    if (isShowLyricView) {
+      promise.resolve(null);
+      return;
+    }
+    maxLineNum = readInt(options, "maxLineNum", maxLineNum);
     if (lyricEvent == null) lyricEvent = new LyricEvent(reactAppContext);
     isShowLyricView = true;
     // [BYD] 拉起前台服务保活
@@ -279,8 +306,11 @@ public class Lyric extends LyricPlayer {
   }
 
   public void setMaxLineNum(int maxLineNum) {
-    if (lyricView == null) return;
-    lyricView.setMaxLineNum(maxLineNum);
+    if (maxLineNum < 1) maxLineNum = 1;
+    this.maxLineNum = maxLineNum;
+    if (lyricView != null) lyricView.setMaxLineNum(maxLineNum);
+    // 行数变了要按新的窗口重新取后续歌词，否则界面还是旧的一行预览
+    if (lastLine >= 0 && lastLine < lines.size()) handleGetCurrentLyric(lastLine);
   }
 
   public void setWidth(int width) {

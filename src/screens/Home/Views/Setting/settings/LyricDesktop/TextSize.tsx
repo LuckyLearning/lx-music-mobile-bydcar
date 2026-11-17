@@ -25,7 +25,10 @@ export default memo(() => {
     setSliderSize(value)
   }, [])
   const handleSlidingComplete = useCallback<NonNullable<SliderProps['onSlidingComplete']>>(value => {
-    if (fontSize == value) return
+    if (fontSize == value) {
+      setSliding(false)
+      return
+    }
     void setDesktopLyricTextSize(value).then(() => {
       updateSetting({ 'desktopLyric.style.fontSize': value })
     }).finally(() => {
@@ -44,7 +47,7 @@ export default memo(() => {
           onValueChange={handleValueChange}
           onSlidingStart={handleSlidingStart}
           step={2}
-          value={fontSize}
+          value={isSliding ? sliderSize : fontSize}
         />
       </View>
     </SubTitle>
