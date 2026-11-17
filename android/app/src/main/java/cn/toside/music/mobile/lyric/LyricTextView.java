@@ -23,6 +23,10 @@ public class LyricTextView extends TextView {
   private float y = 0F;
   private String text = null;
   private final Paint mPaint;
+  // [BYD] 描边（outline）画笔：先描边再填充，提升浅色歌词在浅底上的可读性
+  private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+  private int strokeColor = 0;
+  private float strokeWidth = 0f;
   private final Runnable mStartScrollRunnable;
   private final Runnable invalidateRunnable;
   public static final int startScrollDelay = 1500;
@@ -68,6 +72,20 @@ public class LyricTextView extends TextView {
   public void setShadowLayer(float radius, float dx, float dy, int shadowColor) {
     if (mPaint != null) mPaint.setShadowLayer(radius, dx, dy, shadowColor);
     post(mStartScrollRunnable);
+  }
+
+  // [BYD] 设置文字描边（outline）。先画描边再填字，浅色歌词压浅底也可读。
+  // 关键：描边色 alpha 需钳到 254，否则 Paint 会把 alpha=255 的描边与文字透明度绑定，
+  // 导致文字半透明时描边一起淡掉（WindTone 同款处理）。
+  public void setStroke(int color, float width) {
+    this.strokeColor = (color >>> 24) == 0xFF ? (color & 0xFEFFFFFF) : color;
+    this.strokeWidth = width;
+    strokePaint.setStyle(Paint.Style.STROKE);
+    strokePaint.setStrokeJoin(Paint.Join.ROUND);
+    strokePaint.setStrokeWidth(width);
+    strokePaint.setColor(this.strokeColor);
+    if (mPaint != null) strokePaint.setTypeface(mPaint.getTypeface());
+    postInvalidate();
   }
 
   @Override
@@ -119,6 +137,12 @@ public class LyricTextView extends TextView {
     float mSpeed = speed;
     if (text != null) {
       Log.d("Lyric", "getHeight: " + getHeight() + " y: " + y);
+      // [BYD] 先描边后填充，提升可读性
+      if (strokeWidth > 0f) {
+        strokePaint.setTextSize(mPaint.getTextSize());
+        strokePaint.setTypeface(mPaint.getTypeface());
+        canvas.drawText(text, getDrawX(), y, strokePaint);
+      }
       canvas.drawText(text, getDrawX(), y, mPaint);
       if (getText().length() >= 20) {
         mSpeed += mSpeed;

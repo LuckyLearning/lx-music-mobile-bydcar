@@ -188,6 +188,33 @@ public class LyricModule extends ReactContextBaseJavaModule {
     promise.resolve(null);
   }
 
+  // [BYD] 枚举可投屏显示器
+  @ReactMethod
+  public void getDisplays(Promise promise) {
+    promise.resolve(LyricDisplays.list(reactContext));
+  }
+
+  // [BYD] 设置悬浮窗背景样式
+  @ReactMethod
+  public void setBackgroundStyle(String bgColor, float bgRadius, String borderColor, float borderWidth, Promise promise) {
+    if (lyric != null) lyric.setBackgroundStyle(bgColor, bgRadius, borderColor, borderWidth);
+    promise.resolve(null);
+  }
+
+  // [BYD] 设置字距
+  @ReactMethod
+  public void setLetterSpacing(float letterSpacing, Promise promise) {
+    if (lyric != null) lyric.setLetterSpacing(letterSpacing);
+    promise.resolve(null);
+  }
+
+  // [BYD] 切换投屏目标屏
+  @ReactMethod
+  public void setTargetDisplay(int displayId, Promise promise) {
+    if (lyric != null) lyric.setTargetDisplay(displayId);
+    promise.resolve(null);
+  }
+
   @ReactMethod
   public void checkOverlayPermission(Promise promise) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(reactContext)) {

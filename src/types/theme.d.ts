@@ -1,4 +1,6 @@
 import type { ImageSourcePropType } from 'react-native'
+// [BYD] 车机设计令牌并入 ActiveTheme 类型，供 car 组件通过 useTheme() 读取
+import type { DesignTokens } from '@/theme/tokens'
 
 declare global {
   namespace LX {
@@ -260,7 +262,7 @@ declare global {
       'c-primary-light-1000-alpha-900': string
     }
 
-    type ActiveTheme = ThemeColors & Omit<Theme['config']['extInfo'], 'bg-image'> & Pick<Theme, 'id' | 'name' | 'isDark'> & {
+    type ActiveTheme = ThemeColors & DesignTokens & Omit<Theme['config']['extInfo'], 'bg-image'> & Pick<Theme, 'id' | 'name' | 'isDark'> & {
       'c-font': string
       'c-font-label': string
       'c-primary-font': string

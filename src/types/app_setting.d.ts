@@ -307,6 +307,41 @@ declare global {
       'desktopLyric.style.lyricShadowColor': string
 
       /**
+       * [BYD] 悬浮窗背景色
+       */
+      'desktopLyric.style.bgColor': string
+
+      /**
+       * [BYD] 悬浮窗背景圆角
+       */
+      'desktopLyric.style.bgRadius': number
+
+      /**
+       * [BYD] 悬浮窗边框颜色
+       */
+      'desktopLyric.style.borderColor': string
+
+      /**
+       * [BYD] 悬浮窗边框宽度
+       */
+      'desktopLyric.style.borderWidth': number
+
+      /**
+       * [BYD] 悬浮窗字距
+       */
+      'desktopLyric.style.letterSpacing': number
+
+      /**
+       * [BYD] 悬浮窗字体（空字符串表示系统默认）
+       */
+      'desktopLyric.style.fontFamily': string
+
+      /**
+       * [BYD] 悬浮窗投屏目标显示器 id（-1 表示主屏）
+       */
+      'desktopLyric.displayId': number
+
+      /**
        * 是否显示热门搜索
        */
       'search.isShowHotSearch': boolean

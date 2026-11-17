@@ -56,6 +56,15 @@ public class LyricView extends Activity implements View.OnTouchListener {
   private String unplayColor = "rgba(255, 255, 255, 1)";
   private String playedColor = "rgba(7, 197, 86, 1)";
   private String shadowColor = "rgba(0, 0, 0, 0.15)";
+  // [BYD] 悬浮窗自定义样式：背景色/圆角/边框/字距/字体
+  private String bgColor = "rgba(0, 0, 0, 0.35)";
+  private float bgRadius = 12f;
+  private String borderColor = "rgba(255, 255, 255, 0.2)";
+  private float borderWidth = 0f;
+  private float letterSpacing = 0f;
+  private String fontFamily = "";
+  // [BYD] 投屏目标显示器 id（默认主屏）
+  private int targetDisplayId = android.view.Display.DEFAULT_DISPLAY;
   // private String lastText = "LX Music ^-^";
   private String textX = "LEFT";
   private String textY = "TOP";
@@ -135,6 +144,29 @@ public class LyricView extends Activity implements View.OnTouchListener {
     maxWidth = size.x;
     maxHeight = size.y;
     return true;
+  }
+
+  // [BYD] 构造悬浮窗背景：纯色/半透明底 + 可选圆角/边框，替代固定的 rounded_corner
+  private android.graphics.drawable.GradientDrawable buildBackground() {
+    android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+    bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+    bg.setColor(parseColor(bgColor));
+    bg.setCornerRadius(bgRadius);
+    if (borderWidth > 0f) bg.setStroke((int) borderWidth, parseColor(borderColor));
+    return bg;
+  }
+
+  // [BYD] 按目标 displayId 建立对应屏幕的 WindowManager；多屏投射的核心
+  private void resolveWindowManagerForTarget() {
+    Display target = LyricDisplays.resolve(reactContext, targetDisplayId);
+    Context wmContext;
+    if (target != null && target.getDisplayId() != Display.DEFAULT_DISPLAY) {
+      // 非主屏：为该屏创建独立的 display context
+      wmContext = reactContext.createDisplayContext(target);
+    } else {
+      wmContext = reactContext;
+    }
+    windowManager = (WindowManager) wmContext.getSystemService(Context.WINDOW_SERVICE);
   }
 
   private void setLayoutParamsHeight() {
@@ -220,6 +252,14 @@ public class LyricView extends Activity implements View.OnTouchListener {
     textSize = (float) options.getDouble("textSize", textSize);
     widthPercentage = (float) options.getDouble("width", 100) / 100f;
     maxLineNum = (int) options.getDouble("maxLineNum", maxLineNum);
+    // [BYD] 自定义样式与投屏目标屏
+    bgColor = options.getString("bgColor", bgColor);
+    bgRadius = (float) options.getDouble("bgRadius", bgRadius);
+    borderColor = options.getString("borderColor", borderColor);
+    borderWidth = (float) options.getDouble("borderWidth", borderWidth);
+    letterSpacing = (float) options.getDouble("letterSpacing", letterSpacing);
+    fontFamily = options.getString("fontFamily", fontFamily);
+    targetDisplayId = options.getInt("displayId", targetDisplayId);
     handleShowLyric();
     listenOrientationEvent();
   }
@@ -256,6 +296,13 @@ public class LyricView extends Activity implements View.OnTouchListener {
     textView.setShadowColor(parseColor(shadowColor));
     textView.setAlpha(alpha);
     textView.setTextSize(textSize);
+    // [BYD] 应用字距与自定义字体
+    textView.setLetterSpacings(letterSpacing);
+    if (!fontFamily.isEmpty()) {
+      try {
+        textView.setTypeface(android.graphics.Typeface.create(fontFamily, android.graphics.Typeface.NORMAL));
+      } catch (Exception ignored) { /* 字体不可用时回退系统字体 */ }
+    }
     // Log.d("Lyric", "alpha: " + alpha + " text size: " + textSize);
 
     //监听 OnTouch 事件 为了实现"移动歌词"功能
@@ -295,7 +342,8 @@ public class LyricView extends Activity implements View.OnTouchListener {
   }
   private void handleShowLyric() {
     if (windowManager == null) {
-      windowManager = (WindowManager) reactContext.getSystemService(Context.WINDOW_SERVICE);
+      // [BYD] 按目标屏建立 WindowManager（默认为主屏，行为与上游一致）
+      resolveWindowManagerForTarget();
       //设置TextView的属性
       layoutParams = new WindowManager.LayoutParams();
 
@@ -332,7 +380,8 @@ public class LyricView extends Activity implements View.OnTouchListener {
         layoutParams.alpha = 0.8f;
       }
     } else {
-      textView.setBackgroundResource(R.drawable.rounded_corner);
+      // [BYD] 非锁定态使用自定义背景（色/圆角/边框）
+      textView.setBackground(buildBackground());
 
       if (Build.VERSION.SDK_INT > Build.VERSION_CODES.R) {
         layoutParams.alpha = 1.0f;
@@ -508,7 +557,8 @@ public class LyricView extends Activity implements View.OnTouchListener {
     if (Build.VERSION.SDK_INT > Build.VERSION_CODES.R) {
       layoutParams.alpha = 1.0f;
     }
-    textView.setBackgroundResource(R.drawable.rounded_corner);
+    // [BYD] 解锁后恢复自定义背景
+    textView.setBackground(buildBackground());
     windowManager.updateViewLayout(textView, layoutParams);
   }
 
@@ -590,6 +640,45 @@ public class LyricView extends Activity implements View.OnTouchListener {
     textView.setTextSize(size);
     setLayoutParamsHeight();
     windowManager.updateViewLayout(textView, layoutParams);
+  }
+
+  // [BYD] 更新背景样式（色/圆角/边框），实时生效
+  public void setBackgroundStyle(String bgColor, float bgRadius, String borderColor, float borderWidth) {
+    this.bgColor = bgColor;
+    this.bgRadius = bgRadius;
+    this.borderColor = borderColor;
+    this.borderWidth = borderWidth;
+    if (windowManager == null || textView == null) return;
+    if (!isLock) {
+      textView.setBackground(buildBackground());
+      windowManager.updateViewLayout(textView, layoutParams);
+    }
+  }
+
+  // [BYD] 更新字距
+  public void setLetterSpacing(float letterSpacing) {
+    this.letterSpacing = letterSpacing;
+    if (textView == null) return;
+    textView.setLetterSpacings(letterSpacing);
+  }
+
+  // [BYD] 切换投屏目标屏：销毁旧窗、换 WindowManager、在原位置重建
+  public void setTargetDisplay(int displayId) {
+    if (this.targetDisplayId == displayId) return;
+    this.targetDisplayId = displayId;
+    if (!isShowEnabled()) return; // 未展示时不处理，等下次 show
+    // 记录当前位置百分比，重建后恢复
+    if (windowManager != null && textView != null) {
+      try { windowManager.removeView(textView); } catch (Exception ignored) {}
+    }
+    windowManager = null;
+    layoutParams = null;
+    textView = null;
+    handleShowLyric();
+  }
+
+  private boolean isShowEnabled() {
+    return windowManager != null && textView != null;
   }
 
   public void destroyView() {

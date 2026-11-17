@@ -166,6 +166,8 @@ public class Lyric extends LyricPlayer {
     if (isShowLyricView) return;
     if (lyricEvent == null) lyricEvent = new LyricEvent(reactAppContext);
     isShowLyricView = true;
+    // [BYD] 拉起前台服务保活
+    startOverlayService();
     if (lyricView == null) lyricView = new LyricView(reactAppContext, lyricEvent);
     try {
       lyricView.showLyricView(options);
@@ -178,10 +180,34 @@ public class Lyric extends LyricPlayer {
     promise.resolve(null);
   }
 
+  // [BYD] 启动/停止前台保活服务
+  private void startOverlayService() {
+    try {
+      Intent intent = new Intent(reactAppContext, LyricOverlayService.class);
+      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        reactAppContext.startForegroundService(intent);
+      } else {
+        reactAppContext.startService(intent);
+      }
+    } catch (Exception e) {
+      Log.w("Lyric", "startOverlayService failed: " + e.getMessage());
+    }
+  }
+
+  private void stopOverlayService() {
+    try {
+      reactAppContext.stopService(new Intent(reactAppContext, LyricOverlayService.class));
+    } catch (Exception e) {
+      Log.w("Lyric", "stopOverlayService failed: " + e.getMessage());
+    }
+  }
+
   public void hideDesktopLyric() {
     if (!isShowLyricView) return;
     isShowLyricView = false;
     pausePlayer();
+    // [BYD] 停掉前台保活服务
+    stopOverlayService();
     if (lyricView != null) {
       lyricView.destroy();
       lyricView = null;
@@ -283,5 +309,23 @@ public class Lyric extends LyricPlayer {
   public void setLyricTextPosition(String positionX, String positionY) {
     if (lyricView == null) return;
     lyricView.setLyricTextPosition(positionX, positionY);
+  }
+
+  // [BYD] 自定义背景样式
+  public void setBackgroundStyle(String bgColor, float bgRadius, String borderColor, float borderWidth) {
+    if (lyricView == null) return;
+    lyricView.setBackgroundStyle(bgColor, bgRadius, borderColor, borderWidth);
+  }
+
+  // [BYD] 字距
+  public void setLetterSpacing(float letterSpacing) {
+    if (lyricView == null) return;
+    lyricView.setLetterSpacing(letterSpacing);
+  }
+
+  // [BYD] 切换投屏屏
+  public void setTargetDisplay(int displayId) {
+    if (lyricView == null) return;
+    lyricView.setTargetDisplay(displayId);
   }
 }

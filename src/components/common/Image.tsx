@@ -1,7 +1,7 @@
 import { useTheme } from '@/store/theme/hook'
 import { BorderRadius } from '@/theme'
 import { createStyle } from '@/utils/tools'
-import { type ComponentProps, memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ComponentProps, type ReactNode, memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { View, type ViewProps, StyleSheet, Image as FastImage } from 'react-native'
 // import FastImage, { type FastImageProps } from 'react-native-fast-image'
 import Text from './Text'
@@ -11,6 +11,8 @@ import { useLayout } from '@/utils/hooks'
 export interface ImageProps extends ViewProps {
   style: ComponentProps<typeof FastImage>['style']
   url?: string | number | null
+  // [BYD] 可选占位内容：车机列表项在封面缺失时显示自定义占位
+  fallback?: ReactNode
   cache?: boolean
   resizeMode?: ComponentProps<typeof FastImage>['resizeMode']
   onError?: (url: string | number) => void
@@ -34,7 +36,7 @@ const EmptyPic = memo(({ style, nativeID }: { style: ImageProps['style'], native
   )
 })
 
-const Image = memo(({ url, cache, resizeMode = 'cover', style, onError, nativeID }: ImageProps) => {
+const Image = memo(({ url, cache, resizeMode = 'cover', style, onError, nativeID, fallback }: ImageProps) => {
   const [isError, setError] = useState(false)
   const handleError = useCallback(() => {
     setError(true)
@@ -50,7 +52,8 @@ const Image = memo(({ url, cache, resizeMode = 'cover', style, onError, nativeID
       : url
   const showDefault = useMemo(() => !uri || isError, [isError, uri])
   return (
-    showDefault ? <EmptyPic style={style} nativeID={nativeID} />
+    // [BYD] 封面缺失时优先用调用方传入的 fallback
+    showDefault ? fallback ?? <EmptyPic style={style} nativeID={nativeID} />
       : (
           <FastImage
             style={style}

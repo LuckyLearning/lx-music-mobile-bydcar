@@ -59,6 +59,13 @@ export const showDesktopLyricView = async({
   positionY,
   textPositionX,
   textPositionY,
+  bgColor,
+  bgRadius,
+  borderColor,
+  borderWidth,
+  letterSpacing,
+  fontFamily,
+  displayId,
 }: {
   isShowToggleAnima: boolean
   isSingleLine: boolean
@@ -74,6 +81,13 @@ export const showDesktopLyricView = async({
   positionY: number
   textPositionX: LX.AppSetting['desktopLyric.textPosition.x']
   textPositionY: LX.AppSetting['desktopLyric.textPosition.y']
+  bgColor: string
+  bgRadius: number
+  borderColor: string
+  borderWidth: number
+  letterSpacing: number
+  fontFamily: string
+  displayId: number
 }): Promise<void> => {
   return LyricModule.showDesktopLyric({
     isSingleLine,
@@ -90,6 +104,13 @@ export const showDesktopLyricView = async({
     textY: textPositionY.toUpperCase(),
     width,
     maxLineNum,
+    bgColor,
+    bgRadius,
+    borderColor,
+    borderWidth,
+    letterSpacing,
+    fontFamily,
+    displayId,
   })
 }
 
@@ -215,6 +236,38 @@ export const checkOverlayPermission = async(): Promise<void> => {
 
 export const openOverlayPermissionActivity = async(): Promise<void> => {
   return LyricModule.openOverlayPermissionActivity()
+}
+
+// ===== [BYD] 悬浮窗增强：多屏投射 / 背景边框样式 / 字距 =====
+
+export interface LyricDisplayInfo {
+  id: number
+  name: string
+  width: number
+  height: number
+  density: number
+  isDefault: boolean
+  isPresentation: boolean
+}
+
+/** 枚举可投屏显示器（车机副驾屏/后排屏） */
+export const getDisplays = async(): Promise<LyricDisplayInfo[]> => {
+  return LyricModule.getDisplays()
+}
+
+/** 设置背景样式：背景色 / 圆角 / 边框色 / 边框宽 */
+export const setBackgroundStyle = async(bgColor: string, bgRadius: number, borderColor: string, borderWidth: number): Promise<void> => {
+  return LyricModule.setBackgroundStyle(bgColor, bgRadius, borderColor, borderWidth)
+}
+
+/** 设置字距 */
+export const setLetterSpacing = async(letterSpacing: number): Promise<void> => {
+  return LyricModule.setLetterSpacing(letterSpacing)
+}
+
+/** 切换投屏目标显示器 */
+export const setTargetDisplay = async(displayId: number): Promise<void> => {
+  return LyricModule.setTargetDisplay(displayId)
 }
 
 export const onPositionChange = (handler: (position: { x: number, y: number }) => void): () => void => {

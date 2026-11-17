@@ -93,3 +93,30 @@ export const scaleSizeAbsHR = (size: number) => {
   let scaleHeight = size * scale
   return size * 2 - Math.floor(scaleHeight / pixelRatio)
 }
+
+// ===== [BYD] 车机设计稿（1920×1080）尺寸换算 =====
+// 供 src/components/car 使用；不改变上游既有 scaleSizeW/H 系列行为。
+const CAR_DESIGN_WIDTH = 1920
+const CAR_DESIGN_HEIGHT = 1080
+let carScale = 0
+windowSizeTools.onSizeChanged(() => {
+  carScale = 0
+})
+const getCarScale = () => {
+  if (carScale) return carScale
+  const { width, height } = windowSizeTools.getSize()
+  if (!width || !height) return 1
+  carScale = Math.min(Math.max(width, height) / CAR_DESIGN_WIDTH, Math.min(width, height) / CAR_DESIGN_HEIGHT)
+  return carScale
+}
+
+/** 设计稿尺寸转 dp，用于间距、圆角、图片等布局尺寸，不随界面字号设置变化 */
+export const px = (size: number) => {
+  return PixelRatio.roundToNearestPixel(size * getCarScale())
+}
+
+/** 设计稿字号转 dp，随界面字号设置（global.lx.fontSize）缩放 */
+export const sp = (size: number) => {
+  return PixelRatio.roundToNearestPixel(size * getCarScale() * global.lx.fontSize / fontScale)
+}
+// ===== [/BYD] =====
