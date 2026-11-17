@@ -74,6 +74,21 @@ export const readAlphaPercent = (input: string): number => {
   return Math.round(parsed.a * 100)
 }
 
+/**
+ * 存盘字符串里带不带透明度通道。
+ * #RGBA / #RRGGBBAA / rgba() 有；#RGB / #RRGGBB / rgb() 没有。
+ * 取色盘只在已有透明度时才挂 AlphaSlideBar。
+ */
+export const colorSupportsAlpha = (input: string): boolean => {
+  if (typeof input != 'string') return false
+  const text = input.trim()
+  if (text.startsWith('#')) {
+    const body = text.slice(1)
+    return body.length == 4 || body.length == 8
+  }
+  return /^rgba\(/i.test(text)
+}
+
 /** 只替换透明度，保留 RGB。无法解析时返回 null，调用方不要写入。 */
 export const setAlphaPercent = (input: string, percent: number): string | null => {
   const parsed = parseColorValue(input)

@@ -24,3 +24,6 @@
   **[] $VALUES;
   public *;
 }
+
+# [BYD] ColorPickerView 的对话框按类名填充色相环和滑条，混淆时保留。
+-keep class com.skydoves.colorpickerview.** { *; }

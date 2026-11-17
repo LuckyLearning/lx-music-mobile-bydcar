@@ -588,6 +588,7 @@
   "setting_lyric_desktop_font_inc": "Increase font size",
   "setting_lyric_desktop_align": "Horizontal alignment",
   "setting_lyric_desktop_color": "Color",
+  "setting_lyric_desktop_color_pick": "Tap the swatch to open the color picker",
   "setting_lyric_desktop_color_invalid": "Invalid color. The last valid color is kept.",
   "setting_lyric_desktop_shadow_color": "Shadow color",
   "setting_lyric_desktop_stroke": "Lyric stroke",

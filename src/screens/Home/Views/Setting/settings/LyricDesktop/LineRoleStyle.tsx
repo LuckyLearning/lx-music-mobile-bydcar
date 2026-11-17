@@ -83,6 +83,11 @@ export default memo(({ role }: { role: Role }) => {
   const hollow = role == 'current' ? currentHollow : role == 'other' ? otherHollow : titleHollow
   const hollowSize = role == 'current' ? currentHollowSize : role == 'other' ? otherHollowSize : titleHollowSize
   const color = role == 'current' ? playedColor : role == 'other' ? unplayColor : titleColor
+  const colorTitle = role == 'current'
+    ? t('setting_lyric_desktop_theme_current')
+    : role == 'other'
+      ? t('setting_lyric_desktop_theme_other')
+      : t('setting_lyric_desktop_title_color')
 
   const [letterSliding, setLetterSliding] = useState(letter)
   const [isLetterSliding, setLetterSlidingFlag] = useState(false)
@@ -183,12 +188,12 @@ export default memo(({ role }: { role: Role }) => {
   return (
     <>
       <SubTitle title={t('setting_lyric_desktop_color')}>
-        <ColorValueField value={color} onChange={onColor} />
+        <ColorValueField title={colorTitle} value={color} onChange={onColor} />
       </SubTitle>
       {role == 'current'
         ? (
             <SubTitle title={t('setting_lyric_desktop_shadow_color')}>
-              <ColorValueField value={shadowColor} onChange={onShadow} />
+              <ColorValueField title={t('setting_lyric_desktop_shadow_color')} value={shadowColor} onChange={onShadow} />
             </SubTitle>
           )
         : null}
