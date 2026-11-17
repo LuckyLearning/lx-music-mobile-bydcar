@@ -194,10 +194,10 @@ dependencies {
     // implementation "androidx.javascriptengine:javascriptengine:1.0.0-alpha07"
     // implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation 'wang.harlon.quickjs:wrapper-android:2.4.0'
-    // [BYD] 悬浮窗取色盘。2.5.0 在 Maven Central（com.github.skydoves:colorpickerview）。
-    // React Native 0.73 的 DependencyUtils.configureRepositories 已经加入 mavenCentral，
-    // 这里不再另加 JitPack 或其它仓库，避免改解析顺序。
-    implementation 'com.github.skydoves:colorpickerview:2.5.0'
+    // [BYD] 悬浮窗取色盘。钉在 2.4.0：2.5.0 依赖 appcompat 1.8.0（minSdk 23），
+    // 而车机工程 minSdk 仍是 21。2.4.0 依赖 appcompat 1.7.1，仍支持 API 21。
+    // 坐标在 Maven Central；RN 0.73 已加入 mavenCentral，不另加仓库。
+    implementation 'com.github.skydoves:colorpickerview:2.4.0'
 
   if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
