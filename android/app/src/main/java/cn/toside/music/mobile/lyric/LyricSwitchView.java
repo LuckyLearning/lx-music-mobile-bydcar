@@ -123,7 +123,7 @@ public final class LyricSwitchView extends TextSwitcher {
   private void setAnima() {
     if (textView == null) return;
     if (isShowAnima) {
-      float size = textView.getTextSize();
+      float size = textView.getHeight() > 0 ? textView.getHeight() : textView.getTextSize();
       setInAnimation(inAnim("top", size));
       setOutAnimation(outAnim("top", size));
     } else {

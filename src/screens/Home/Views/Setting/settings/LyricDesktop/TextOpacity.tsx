@@ -25,7 +25,10 @@ export default memo(() => {
     setSliderSize(value)
   }, [])
   const handleSlidingComplete = useCallback<NonNullable<SliderProps['onSlidingComplete']>>(value => {
-    if (opacity == value) return
+    if (opacity == value) {
+      setSliding(false)
+      return
+    }
     void setDesktopLyricAlpha(value).then(() => {
       updateSetting({ 'desktopLyric.style.opacity': value })
     }).finally(() => {
@@ -44,7 +47,7 @@ export default memo(() => {
           onValueChange={handleValueChange}
           onSlidingStart={handleSlidingStart}
           step={2}
-          value={opacity}
+          value={isSliding ? sliderSize : opacity}
         />
       </View>
     </SubTitle>

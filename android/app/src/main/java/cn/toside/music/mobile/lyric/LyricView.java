@@ -11,8 +11,10 @@ import android.hardware.SensorManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Choreographer;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -21,12 +23,12 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.WritableMap;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,18 +40,19 @@ import java.util.regex.Pattern;
  * FrameLayout(root, 背景独立于文字透明度)
  *   └─ LinearLayout(column)
  *        ├─ titleView（可选，歌名/歌名+歌手）
- *        ├─ textView 当前行 LyricSwitchView
- *        └─ otherView 其它行 StrokeTextView
+ *        └─ 单行：textView LyricSwitchView
+ *           多行：lyricLines 整列联动滚动
  *
  * 背景挂在 root 上，锁定时也保留；文字透明度只改文字色 alpha，不再 setAlpha 整窗，
  * 避免「背景色不起效」。
+ * 拖动按帧合并，并关掉系统窗口位移动画，避免上下滑动一卡一卡。
  */
 public class LyricView extends Activity implements View.OnTouchListener {
   FrameLayout rootView = null;
   LinearLayout columnView = null;
   StrokeTextView titleView = null;
   LyricSwitchView textView = null;
-  StrokeTextView otherView = null;
+  LyricLinesView lyricLines = null;
   WindowManager windowManager = null;
   WindowManager.LayoutParams layoutParams = null;
   final private ReactApplicationContext reactContext;
@@ -57,15 +60,21 @@ public class LyricView extends Activity implements View.OnTouchListener {
 
   private float lastX;
   private float lastY;
-  private float nowX;
-  private float nowY;
   private float tranX;
   private float tranY;
   private float prevViewPercentageX = 0;
   private float prevViewPercentageY = 0;
   private float widthPercentage = 1f;
 
-  private float preY = 0;
+  private boolean dragging = false;
+  private boolean dragFramePosted = false;
+  private boolean layoutDirty = false;
+  private float pendingX = 0f;
+  private float pendingY = 0f;
+  private final Choreographer.FrameCallback dragFrameCallback = frameTimeNanos -> {
+    dragFramePosted = false;
+    applyPendingPosition();
+  };
 
   private boolean isLock = false;
   private boolean isSingleLine = false;
@@ -94,6 +103,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
   private int maxHeight = 0;
 
   private int maxLineNum = 5;
+  private int currentLineNum = Integer.MIN_VALUE;
   private String currentLyric = "LX Music ^-^";
   private ArrayList<String> currentExtendedLyrics = new ArrayList<>();
 
@@ -108,17 +118,20 @@ public class LyricView extends Activity implements View.OnTouchListener {
   private int mLastRotation;
   private OrientationEventListener orientationEventListener = null;
 
-  final Handler fixViewPositionHandler;
+  final Handler mainHandler;
   final Runnable fixViewPositionRunnable = this::updateViewPosition;
 
-  // 内置空心样式：细描边偏白 / 电影字幕粗黑描边
-  private static final int HOLLOW_STYLE1_COLOR = Color.argb(230, 255, 255, 255);
-  private static final int HOLLOW_STYLE2_COLOR = Color.argb(230, 0, 0, 0);
+  // 系统给窗口位置变化加了补间，跟手拖动会一顿一顿。这是隐藏 flag。
+  private static final int PRIVATE_FLAG_NO_MOVE_ANIMATION = 0x00000040;
 
   LyricView(ReactApplicationContext reactContext, LyricEvent lyricEvent) {
     this.reactContext = reactContext;
     this.lyricEvent = lyricEvent;
-    fixViewPositionHandler = new Handler();
+    mainHandler = new Handler(Looper.getMainLooper());
+  }
+
+  private boolean onMainThread() {
+    return Looper.myLooper() == Looper.getMainLooper();
   }
 
   private void listenOrientationEvent() {
@@ -129,7 +142,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
           Display display = windowManager.getDefaultDisplay();
           int rotation = display.getRotation();
           if (rotation != mLastRotation) {
-            fixViewPositionHandler.postDelayed(fixViewPositionRunnable, 300);
+            mainHandler.postDelayed(fixViewPositionRunnable, 300);
           }
           mLastRotation = rotation;
         }
@@ -149,7 +162,8 @@ public class LyricView extends Activity implements View.OnTouchListener {
     int flag = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
       WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
       WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
-      WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+      WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS |
+      WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
 
     if (isLock) {
       flag = flag | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
@@ -201,19 +215,17 @@ public class LyricView extends Activity implements View.OnTouchListener {
   }
 
   private int estimateContentHeight() {
-    int lineH = textView != null && textView.getPaint() != null
-      ? textView.getPaint().getFontMetricsInt(null)
-      : (int) (textSize * 1.4f);
-    int otherH = otherView != null && otherView.getPaint() != null
-      ? otherView.getPaint().getFontMetricsInt(null)
-      : (int) (otherTextSize * 1.35f);
     int titleH = 0;
     if (!"none".equals(titleMode) && titleView != null && titleView.getVisibility() == View.VISIBLE) {
       titleH = titleView.getPaint().getFontMetricsInt(null) + dp(4);
     }
-    int otherLines = Math.max(0, maxLineNum - 1);
-    if (isSingleLine) otherLines = 0;
-    return titleH + lineH + otherH * otherLines + dp(16);
+    if (!isSingleLine && lyricLines != null) {
+      return titleH + lyricLines.getDesiredHeight() + dp(16);
+    }
+    int lineH = textView != null && textView.getPaint() != null
+      ? textView.getPaint().getFontMetricsInt(null)
+      : (int) (textSize * 1.4f);
+    return titleH + lineH + dp(16);
   }
 
   private void setLayoutParamsHeight() {
@@ -227,19 +239,74 @@ public class LyricView extends Activity implements View.OnTouchListener {
   }
 
   private void fixViewPosition() {
-    int maxX = maxWidth - layoutParams.width;
+    setLayoutParamsHeight();
+    // 手指还按着时不要用旧百分比把窗口拽回去
+    if (dragging) {
+      layoutDirty = true;
+      return;
+    }
+    int maxX = Math.max(0, maxWidth - layoutParams.width);
     int x = (int) (maxWidth * prevViewPercentageX);
     if (x < 0) x = 0;
     else if (x > maxX) x = maxX;
     if (layoutParams.x != x) layoutParams.x = x;
 
-    setLayoutParamsHeight();
-
-    int maxY = maxHeight - layoutParams.height;
+    int maxY = Math.max(0, maxHeight - layoutParams.height);
     int y = (int) (maxHeight * prevViewPercentageY);
     if (y < 0) y = 0;
     else if (y > maxY) y = maxY;
     if (layoutParams.y != y) layoutParams.y = y;
+    pendingX = layoutParams.x;
+    pendingY = layoutParams.y;
+  }
+
+  /** 关掉系统对悬浮窗移动的补间，否则连续 updateViewLayout 会一卡一卡。 */
+  private void disableMoveAnimation() {
+    if (layoutParams == null) return;
+    try {
+      Field field = WindowManager.LayoutParams.class.getDeclaredField("privateFlags");
+      field.setAccessible(true);
+      int flags = field.getInt(layoutParams);
+      field.setInt(layoutParams, flags | PRIVATE_FLAG_NO_MOVE_ANIMATION);
+    } catch (Exception ignored) {}
+  }
+
+  private void commitLayout() {
+    if (windowManager == null || rootView == null || layoutParams == null) return;
+    if (dragging) {
+      layoutDirty = true;
+      return;
+    }
+    disableMoveAnimation();
+    try {
+      windowManager.updateViewLayout(rootView, layoutParams);
+      layoutDirty = false;
+    } catch (Exception ignored) {}
+  }
+
+  private void scheduleDragFrame() {
+    if (dragFramePosted) return;
+    dragFramePosted = true;
+    Choreographer.getInstance().postFrameCallback(dragFrameCallback);
+  }
+
+  private void applyPendingPosition() {
+    if (windowManager == null || rootView == null || layoutParams == null) return;
+    int maxX = Math.max(0, maxWidth - layoutParams.width);
+    int maxY = Math.max(0, maxHeight - layoutParams.height);
+    int x = Math.round(pendingX);
+    int y = Math.round(pendingY);
+    if (x < 0) x = 0;
+    else if (x > maxX) x = maxX;
+    if (y < 0) y = 0;
+    else if (y > maxY) y = maxY;
+    if (layoutParams.x == x && layoutParams.y == y) return;
+    layoutParams.x = x;
+    layoutParams.y = y;
+    disableMoveAnimation();
+    try {
+      windowManager.updateViewLayout(rootView, layoutParams);
+    } catch (Exception ignored) {}
   }
 
   private void updateViewPosition() {
@@ -251,7 +318,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
     }
 
     fixViewPosition();
-    windowManager.updateViewLayout(rootView, layoutParams);
+    commitLayout();
   }
 
   public void sendPositionEvent(float x, float y) {
@@ -270,6 +337,18 @@ public class LyricView extends Activity implements View.OnTouchListener {
   }
 
   public void showLyricView(Bundle options) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> showLyricView(options));
+      return;
+    }
+    try {
+      showLyricViewOnMain(options);
+    } catch (Exception e) {
+      Log.e("Lyric", "showLyricView", e);
+    }
+  }
+
+  private void showLyricViewOnMain(Bundle options) {
     isLock = options.getBoolean("isLock", isLock);
     isSingleLine = options.getBoolean("isSingleLine", isSingleLine);
     isShowToggleAnima = options.getBoolean("isShowToggleAnima", isShowToggleAnima);
@@ -310,6 +389,10 @@ public class LyricView extends Activity implements View.OnTouchListener {
   }
 
   public void showLyricView() {
+    if (!onMainThread()) {
+      mainHandler.post(this::showLyricView);
+      return;
+    }
     try {
       handleShowLyric();
     } catch (Exception e) {
@@ -343,9 +426,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
 
   /** 把全局文字透明度叠到颜色上（不改 View.setAlpha，以免背景跟着淡） */
   private int withTextAlpha(int color) {
-    int baseA = (color >>> 24) & 0xFF;
-    int a = Math.max(0, Math.min(255, Math.round(baseA * alpha)));
-    return (color & 0x00FFFFFF) | (a << 24);
+    return LyricStroke.withAlpha(color, alpha);
   }
 
   private int resolveHorizGravity(String align) {
@@ -373,72 +454,29 @@ public class LyricView extends Activity implements View.OnTouchListener {
     }
   }
 
-  private void applyHollowTo(TextView v, boolean isCurrent) {
-    float size = Math.max(0f, hollowSize) * (isCurrent ? 1f : 0.75f);
-    if (hollowStyle <= 0 || size <= 0f) {
-      if (v instanceof LyricTextView) {
-        // LyricSwitchView 内部处理
-      } else if (v instanceof StrokeTextView) {
-        ((StrokeTextView) v).setStrokeStyle(Color.TRANSPARENT, 0f, false);
-      }
-      return;
-    }
-    int strokeColor;
-    float strokeW;
-    boolean hollow;
-    if (hollowStyle == 1) {
-      // 细描边空心
-      strokeColor = HOLLOW_STYLE1_COLOR;
-      strokeW = Math.max(1f, size * 0.7f);
-      hollow = true;
-    } else {
-      // 电影字幕：粗黑描边空心
-      strokeColor = HOLLOW_STYLE2_COLOR;
-      strokeW = Math.max(1.5f, size * 1.2f);
-      hollow = true;
-    }
-    strokeColor = withTextAlpha(strokeColor);
-    if (v instanceof StrokeTextView) {
-      ((StrokeTextView) v).setStrokeStyle(strokeColor, strokeW, hollow);
-    }
-  }
-
-  private void applyHollowToSwitch(LyricSwitchView v, boolean isCurrent) {
-    float size = Math.max(0f, hollowSize) * (isCurrent ? 1f : 0.75f);
-    if (hollowStyle <= 0 || size <= 0f) {
-      v.setStrokeStyle(Color.TRANSPARENT, 0f, false);
-      return;
-    }
-    int strokeColor;
-    float strokeW;
-    boolean hollow = true;
-    if (hollowStyle == 1) {
-      strokeColor = HOLLOW_STYLE1_COLOR;
-      strokeW = Math.max(1f, size * 0.7f);
-    } else {
-      strokeColor = HOLLOW_STYLE2_COLOR;
-      strokeW = Math.max(1.5f, size * 1.2f);
-    }
-    v.setStrokeStyle(withTextAlpha(strokeColor), strokeW, hollow);
-  }
-
   private void applyTextStyles() {
-    if (textView == null) return;
-    Typeface typeface = bold ? Typeface.create(Typeface.DEFAULT, Typeface.BOLD) : Typeface.DEFAULT;
-    textView.setBold(bold);
-    textView.setTextColor(withTextAlpha(parseColor(playedColor)));
-    textView.setShadowColor(withTextAlpha(parseColor(shadowColor)));
-    textView.setLetterSpacings(letterSpacing);
-    textView.setTextSize(textSize);
-    applyHollowToSwitch(textView, true);
+    if (textView != null) {
+      textView.setBold(bold);
+      textView.setTextColor(withTextAlpha(parseColor(playedColor)));
+      textView.setShadowColor(withTextAlpha(parseColor(shadowColor)));
+      textView.setLetterSpacings(letterSpacing);
+      textView.setTextSize(textSize);
+      LyricStroke.apply(textView, hollowStyle, hollowSize, true, alpha);
+    }
 
-    if (otherView != null) {
-      otherView.setTypeface(typeface);
-      otherView.setTextColor(withTextAlpha(parseColor(unplayColor)));
-      otherView.setShadowLayer(1.2f, 1f, 1f, withTextAlpha(parseColor(shadowColor)));
-      otherView.setLetterSpacing(letterSpacing);
-      otherView.setTextSize(otherTextSize);
-      applyHollowTo(otherView, false);
+    if (lyricLines != null) {
+      lyricLines.applyStyles(
+        withTextAlpha(parseColor(playedColor)),
+        withTextAlpha(parseColor(unplayColor)),
+        withTextAlpha(parseColor(shadowColor)),
+        textSize,
+        otherTextSize,
+        letterSpacing,
+        bold,
+        hollowStyle,
+        hollowSize,
+        alpha
+      );
     }
 
     if (titleView != null) {
@@ -447,7 +485,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
       titleView.setTextSize(Math.max(10f, otherTextSize * 0.95f));
       titleView.setLetterSpacing(letterSpacing * 0.5f);
       // 标题跟随空心样式，但更细一点
-      applyHollowTo(titleView, false);
+      LyricStroke.apply(titleView, hollowStyle, hollowSize, false, alpha);
     }
   }
 
@@ -481,12 +519,12 @@ public class LyricView extends Activity implements View.OnTouchListener {
   }
 
   private void rebuildColumnOrder() {
-    if (columnView == null || titleView == null || textView == null || otherView == null) return;
+    View lyricBody = isSingleLine ? textView : lyricLines;
+    if (columnView == null || titleView == null || lyricBody == null) return;
     columnView.removeAllViews();
     boolean titleAbove = !"below".equals(titlePosition);
     if (titleAbove) columnView.addView(titleView);
-    columnView.addView(textView);
-    columnView.addView(otherView);
+    columnView.addView(lyricBody);
     if (!titleAbove) columnView.addView(titleView);
     applyTitleText();
   }
@@ -516,22 +554,26 @@ public class LyricView extends Activity implements View.OnTouchListener {
     titleLp.bottomMargin = dp(4);
     titleView.setLayoutParams(titleLp);
 
-    textView = new LyricSwitchView(reactContext, isSingleLine, isShowToggleAnima);
-    textView.setText("");
-    LinearLayout.LayoutParams currentLp = new LinearLayout.LayoutParams(
-      LinearLayout.LayoutParams.MATCH_PARENT,
-      LinearLayout.LayoutParams.WRAP_CONTENT
-    );
-    textView.setLayoutParams(currentLp);
-
-    otherView = new StrokeTextView(reactContext);
-    otherView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    LinearLayout.LayoutParams otherLp = new LinearLayout.LayoutParams(
-      LinearLayout.LayoutParams.MATCH_PARENT,
-      LinearLayout.LayoutParams.WRAP_CONTENT
-    );
-    otherLp.topMargin = dp(2);
-    otherView.setLayoutParams(otherLp);
+    if (isSingleLine) {
+      textView = new LyricSwitchView(reactContext, true, isShowToggleAnima);
+      textView.setText("");
+      LinearLayout.LayoutParams currentLp = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+      );
+      textView.setLayoutParams(currentLp);
+      lyricLines = null;
+    } else {
+      textView = null;
+      lyricLines = new LyricLinesView(reactContext);
+      lyricLines.setShowAnima(isShowToggleAnima);
+      lyricLines.setVisibleCount(Math.max(1, maxLineNum));
+      LinearLayout.LayoutParams linesLp = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+      );
+      lyricLines.setLayoutParams(linesLp);
+    }
 
     rebuildColumnOrder();
     applyTextStyles();
@@ -543,7 +585,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
   private void applyLyricGravity() {
     int h = resolveHorizGravity(textX);
     if (textView != null) textView.setGravity(h | Gravity.CENTER_VERTICAL);
-    if (otherView != null) otherView.setGravity(h | Gravity.TOP);
+    if (lyricLines != null) lyricLines.setGravity(h);
     if (titleView != null) titleView.setGravity(resolveHorizGravity(titleAlign) | Gravity.CENTER_VERTICAL);
     if (columnView != null && columnView.getLayoutParams() instanceof FrameLayout.LayoutParams) {
       FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) columnView.getLayoutParams();
@@ -593,67 +635,71 @@ public class LyricView extends Activity implements View.OnTouchListener {
     fixViewPosition();
 
     layoutParams.format = PixelFormat.TRANSLUCENT;
+    layoutParams.windowAnimations = 0;
+    disableMoveAnimation();
 
     windowManager.addView(rootView, layoutParams);
 
     // 恢复当前歌词
-    setLyric(currentLyric, currentExtendedLyrics);
+    setLyric(currentLyric, currentExtendedLyrics, currentLineNum);
+  }
+
+  private void relayoutIfHeightChanged() {
+    if (windowManager == null || layoutParams == null || rootView == null) return;
+    if (heightPercentage > 0f) return;
+    int before = layoutParams.height;
+    setLayoutParamsHeight();
+    if (layoutParams.height != before) commitLayout();
   }
 
   public void setLyric(String text, ArrayList<String> extendedLyrics) {
+    setLyric(text, extendedLyrics, currentLineNum);
+  }
+
+  public void setLyric(String text, ArrayList<String> extendedLyrics, int lineNum) {
+    if (!onMainThread()) {
+      String safe = text == null ? "" : text;
+      ArrayList<String> copy = extendedLyrics == null ? new ArrayList<>() : new ArrayList<>(extendedLyrics);
+      mainHandler.post(() -> setLyric(safe, copy, lineNum));
+      return;
+    }
     if (text == null) text = "";
     if (extendedLyrics == null) extendedLyrics = new ArrayList<>();
     currentLyric = text;
     currentExtendedLyrics = extendedLyrics;
-    if (textView == null) return;
+    currentLineNum = lineNum;
 
-    textView.setText(text);
-
-    if (otherView == null) return;
-    if (isSingleLine || maxLineNum <= 1 || extendedLyrics.size() == 0) {
-      otherView.setVisibility(View.GONE);
-      otherView.setText("");
-    } else {
-      int num = maxLineNum - 1;
-      StringBuilder sb = new StringBuilder();
-      for (String lrc : extendedLyrics) {
-        if (lrc == null || lrc.length() == 0) continue;
-        if (sb.length() > 0) sb.append('\n');
-        sb.append(lrc);
-        if (--num < 1) break;
+    if (isSingleLine) {
+      if (textView != null) {
+        CharSequence shown = textView.getText();
+        if (shown == null || !text.contentEquals(shown)) textView.setText(text);
       }
-      if (sb.length() == 0) {
-        otherView.setVisibility(View.GONE);
-        otherView.setText("");
-      } else {
-        otherView.setVisibility(View.VISIBLE);
-        otherView.setMaxLines(Math.max(1, maxLineNum - 1));
-        otherView.setText(sb.toString());
-      }
+    } else if (lyricLines != null) {
+      lyricLines.setLines(text, extendedLyrics, lineNum);
     }
 
-    // 自适应高度：行数变化时重算，避免其它行被裁切
-    if (windowManager != null && layoutParams != null && heightPercentage <= 0f) {
-      setLayoutParamsHeight();
-      try {
-        windowManager.updateViewLayout(rootView, layoutParams);
-      } catch (Exception ignored) {}
-    }
+    // 行高固定后高度通常不变，避免每句歌词都 updateViewLayout 卡一下
+    relayoutIfHeightChanged();
   }
 
   public void setMusicMeta(String name, String singer) {
+    if (!onMainThread()) {
+      String safeName = name == null ? "" : name;
+      String safeSinger = singer == null ? "" : singer;
+      mainHandler.post(() -> setMusicMeta(safeName, safeSinger));
+      return;
+    }
     this.musicName = name == null ? "" : name;
     this.musicSinger = singer == null ? "" : singer;
     applyTitleText();
-    if (windowManager != null && rootView != null && layoutParams != null && heightPercentage <= 0f) {
-      setLayoutParamsHeight();
-      try {
-        windowManager.updateViewLayout(rootView, layoutParams);
-      } catch (Exception ignored) {}
-    }
+    relayoutIfHeightChanged();
   }
 
   public void setTitleOptions(String mode, String position, String align, String color) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setTitleOptions(mode, position, align, color));
+      return;
+    }
     if (mode != null) this.titleMode = mode;
     if (position != null) this.titlePosition = position;
     if (align != null) this.titleAlign = align;
@@ -662,89 +708,120 @@ public class LyricView extends Activity implements View.OnTouchListener {
     rebuildColumnOrder();
     applyTextStyles();
     applyTitleText();
-    if (windowManager != null && layoutParams != null) {
-      if (heightPercentage <= 0f) setLayoutParamsHeight();
-      windowManager.updateViewLayout(rootView, layoutParams);
-    }
+    if (heightPercentage <= 0f) setLayoutParamsHeight();
+    commitLayout();
   }
 
   public void setMaxLineNum(int maxLineNum) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setMaxLineNum(maxLineNum));
+      return;
+    }
     this.maxLineNum = maxLineNum;
     if (rootView == null) return;
-    setLyric(currentLyric, currentExtendedLyrics);
+    if (lyricLines != null) lyricLines.setVisibleCount(Math.max(1, maxLineNum));
     setLayoutParamsHeight();
 
-    int maxY = maxHeight - layoutParams.height;
+    int maxY = Math.max(0, maxHeight - layoutParams.height);
     int y = layoutParams.y;
     if (y < 0) y = 0;
     else if (y > maxY) y = maxY;
     if (layoutParams.y != y) layoutParams.y = y;
 
-    windowManager.updateViewLayout(rootView, layoutParams);
+    commitLayout();
   }
 
   public void setWidth(int width) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setWidth(width));
+      return;
+    }
     if (rootView == null) return;
     widthPercentage = width / 100f;
     layoutParams.width = (int) (maxWidth * widthPercentage);
 
-    int maxX = maxWidth - layoutParams.width;
+    int maxX = Math.max(0, maxWidth - layoutParams.width);
     int x = layoutParams.x;
     if (x < 0) x = 0;
     else if (x > maxX) x = maxX;
     if (layoutParams.x != x) layoutParams.x = x;
 
-    windowManager.updateViewLayout(rootView, layoutParams);
+    commitLayout();
   }
 
   @Override
   public boolean onTouch(View v, MotionEvent event) {
-    int maxX = maxWidth - layoutParams.width;
-    int maxY = maxHeight - layoutParams.height;
+    if (layoutParams == null || windowManager == null || rootView == null) return false;
+    int maxX = Math.max(0, maxWidth - layoutParams.width);
+    int maxY = Math.max(0, maxHeight - layoutParams.height);
 
-    switch (event.getAction()) {
+    switch (event.getActionMasked()) {
       case MotionEvent.ACTION_DOWN:
+        dragging = true;
         lastX = event.getRawX();
         lastY = event.getRawY();
-        preY = lastY;
+        // 按下时的窗口坐标做基准，整段手势用浮点偏移，避免不足 1px 被截掉
+        tranX = layoutParams.x;
+        tranY = layoutParams.y;
+        pendingX = tranX;
+        pendingY = tranY;
         break;
-      case MotionEvent.ACTION_MOVE:
-        nowX = event.getRawX();
-        nowY = event.getRawY();
-        if (preY == 0) {
-          preY = nowY;
+      case MotionEvent.ACTION_MOVE: {
+        if (!dragging) {
+          dragging = true;
+          lastX = event.getRawX();
+          lastY = event.getRawY();
+          tranX = layoutParams.x;
+          tranY = layoutParams.y;
         }
-        tranX = nowX - lastX;
-        tranY = nowY - lastY;
-
-        int x = layoutParams.x + (int) tranX;
+        float x = tranX + (event.getRawX() - lastX);
+        float y = tranY + (event.getRawY() - lastY);
         if (x < 0) x = 0;
         else if (x > maxX) x = maxX;
-        int y = layoutParams.y + (int) tranY;
         if (y < 0) y = 0;
         else if (y > maxY) y = maxY;
-
-        layoutParams.x = x;
-        layoutParams.y = y;
-        windowManager.updateViewLayout(rootView, layoutParams);
-        lastX = nowX;
-        lastY = nowY;
+        pendingX = x;
+        pendingY = y;
+        scheduleDragFrame();
         break;
+      }
       case MotionEvent.ACTION_UP:
-        tranY = 0;
-        float percentageX = (float) layoutParams.x / (float) maxWidth * 100f;
-        float percentageY = (float) layoutParams.y / (float) maxHeight * 100f;
-        if (percentageX != prevViewPercentageX || percentageY != prevViewPercentageY) {
-          prevViewPercentageX = percentageX / 100f;
-          prevViewPercentageY = percentageY / 100f;
-          sendPositionEvent(percentageX, percentageY);
+      case MotionEvent.ACTION_CANCEL: {
+        dragging = false;
+        applyPendingPosition();
+        float oldPctX = prevViewPercentageX;
+        float oldPctY = prevViewPercentageY;
+        if (maxWidth > 0 && maxHeight > 0) {
+          // 先记下松手位置，后面的高度修正才不会把窗口拉回拖动前的百分比
+          prevViewPercentageX = layoutParams.x / (float) maxWidth;
+          prevViewPercentageY = layoutParams.y / (float) maxHeight;
         }
+        if (layoutDirty) {
+          layoutDirty = false;
+          fixViewPosition();
+          commitLayout();
+          if (maxWidth > 0 && maxHeight > 0) {
+            prevViewPercentageX = layoutParams.x / (float) maxWidth;
+            prevViewPercentageY = layoutParams.y / (float) maxHeight;
+          }
+        }
+        if (maxWidth <= 0 || maxHeight <= 0) break;
+        if (Math.abs(prevViewPercentageX - oldPctX) > 0.0005f || Math.abs(prevViewPercentageY - oldPctY) > 0.0005f) {
+          sendPositionEvent(prevViewPercentageX * 100f, prevViewPercentageY * 100f);
+        }
+        break;
+      }
+      default:
         break;
     }
     return true;
   }
 
   public void lockView() {
+    if (!onMainThread()) {
+      mainHandler.post(this::lockView);
+      return;
+    }
     isLock = true;
     if (windowManager == null || rootView == null) return;
     layoutParams.flags = getLayoutParamsFlags();
@@ -753,10 +830,14 @@ public class LyricView extends Activity implements View.OnTouchListener {
     }
     // 锁定仍保留自定义背景
     applyRootBackground();
-    windowManager.updateViewLayout(rootView, layoutParams);
+    commitLayout();
   }
 
   public void unlockView() {
+    if (!onMainThread()) {
+      mainHandler.post(this::unlockView);
+      return;
+    }
     isLock = false;
     if (windowManager == null || rootView == null) return;
     layoutParams.flags = getLayoutParamsFlags();
@@ -764,10 +845,14 @@ public class LyricView extends Activity implements View.OnTouchListener {
       layoutParams.alpha = 1.0f;
     }
     applyRootBackground();
-    windowManager.updateViewLayout(rootView, layoutParams);
+    commitLayout();
   }
 
   public void setColor(String unplayColor, String playedColor, String shadowColor) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setColor(unplayColor, playedColor, shadowColor));
+      return;
+    }
     this.unplayColor = unplayColor;
     this.playedColor = playedColor;
     this.shadowColor = shadowColor;
@@ -775,99 +860,154 @@ public class LyricView extends Activity implements View.OnTouchListener {
   }
 
   public void setLyricTextPosition(String textX, String textY) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setLyricTextPosition(textX, textY));
+      return;
+    }
     this.textX = textX;
     this.textY = textY;
     if (rootView == null) return;
     applyLyricGravity();
-    windowManager.updateViewLayout(rootView, layoutParams);
+    commitLayout();
   }
 
   public void setAlpha(float alpha) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setAlpha(alpha));
+      return;
+    }
     this.alpha = alpha;
     applyTextStyles();
   }
 
   public void setSingleLine(boolean isSingleLine) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setSingleLine(isSingleLine));
+      return;
+    }
     this.isSingleLine = isSingleLine;
     if (rootView == null) return;
-    // 重建视图以切换 LyricTextView / StrokeTextView
+    // 重建视图以切换单行跑马灯 / 多行联动滚动
     try {
       windowManager.removeView(rootView);
     } catch (Exception ignored) {}
     createContentViews();
+    disableMoveAnimation();
     windowManager.addView(rootView, layoutParams);
     if (isLock) lockView();
     else unlockView();
-    setLyric(currentLyric, currentExtendedLyrics);
+    setLyric(currentLyric, currentExtendedLyrics, currentLineNum);
   }
 
   public void setShowToggleAnima(boolean showToggleAnima) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setShowToggleAnima(showToggleAnima));
+      return;
+    }
     isShowToggleAnima = showToggleAnima;
-    if (textView == null) return;
-    textView.setShowAnima(showToggleAnima);
+    if (textView != null) textView.setShowAnima(showToggleAnima);
+    if (lyricLines != null) lyricLines.setShowAnima(showToggleAnima);
   }
 
   public void setTextSize(float size) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setTextSize(size));
+      return;
+    }
     this.textSize = size;
     if (rootView == null) return;
     applyTextStyles();
     setLayoutParamsHeight();
-    windowManager.updateViewLayout(rootView, layoutParams);
+    commitLayout();
   }
 
   public void setOtherTextSize(float size) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setOtherTextSize(size));
+      return;
+    }
     this.otherTextSize = size;
     if (rootView == null) return;
     applyTextStyles();
     setLayoutParamsHeight();
-    windowManager.updateViewLayout(rootView, layoutParams);
+    commitLayout();
   }
 
   public void setBackgroundStyle(String bgColor, float bgRadius, String borderColor, float borderWidth) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setBackgroundStyle(bgColor, bgRadius, borderColor, borderWidth));
+      return;
+    }
     this.bgColor = bgColor;
     this.bgRadius = bgRadius;
     this.borderColor = borderColor;
     this.borderWidth = borderWidth;
     if (rootView == null) return;
     applyRootBackground();
-    windowManager.updateViewLayout(rootView, layoutParams);
   }
 
   public void setLetterSpacing(float letterSpacing) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setLetterSpacing(letterSpacing));
+      return;
+    }
     this.letterSpacing = letterSpacing;
     applyTextStyles();
   }
 
   public void setPositionPercent(float x, float y) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setPositionPercent(x, y));
+      return;
+    }
     prevViewPercentageX = x / 100f;
     prevViewPercentageY = y / 100f;
     if (windowManager == null || rootView == null || layoutParams == null) return;
-    fixViewPosition();
-    windowManager.updateViewLayout(rootView, layoutParams);
+    if (dragging) return;
+    int maxX = Math.max(0, maxWidth - layoutParams.width);
+    int maxY = Math.max(0, maxHeight - layoutParams.height);
+    float px = maxWidth * prevViewPercentageX;
+    float py = maxHeight * prevViewPercentageY;
+    if (px < 0) px = 0;
+    else if (px > maxX) px = maxX;
+    if (py < 0) py = 0;
+    else if (py > maxY) py = maxY;
+    pendingX = px;
+    pendingY = py;
+    scheduleDragFrame();
   }
 
   public void setHeightPercent(float height) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setHeightPercent(height));
+      return;
+    }
     heightPercentage = height / 100f;
     if (windowManager == null || rootView == null || layoutParams == null) return;
     setLayoutParamsHeight();
     fixViewPosition();
-    windowManager.updateViewLayout(rootView, layoutParams);
+    commitLayout();
   }
 
   /** [BYD] 加粗 + 内置空心样式 + 空心大小；其它行同步区分大小 */
   public void setLyricStyle(boolean isBold, int newHollowStyle, float newHollowSize) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setLyricStyle(isBold, newHollowStyle, newHollowSize));
+      return;
+    }
     this.bold = isBold;
     this.hollowStyle = newHollowStyle;
     this.hollowSize = newHollowSize;
     if (rootView == null) return;
     applyTextStyles();
-    if (windowManager != null && layoutParams != null && heightPercentage <= 0f) {
-      setLayoutParamsHeight();
-      windowManager.updateViewLayout(rootView, layoutParams);
-    }
+    relayoutIfHeightChanged();
   }
 
   public void setTargetDisplay(int displayId) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setTargetDisplay(displayId));
+      return;
+    }
     if (displayId < 0) displayId = Display.DEFAULT_DISPLAY;
     if (this.targetDisplayId == displayId) return;
     this.targetDisplayId = displayId;
@@ -881,7 +1021,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
     layoutParams = null;
     rootView = null;
     textView = null;
-    otherView = null;
+    lyricLines = null;
     titleView = null;
     columnView = null;
     handleShowLyric();
@@ -892,19 +1032,27 @@ public class LyricView extends Activity implements View.OnTouchListener {
   }
 
   public void destroyView() {
+    if (!onMainThread()) {
+      mainHandler.post(this::destroyView);
+      return;
+    }
     if (rootView == null || windowManager == null) return;
     try {
       windowManager.removeView(rootView);
     } catch (Exception ignored) {}
     rootView = null;
     textView = null;
-    otherView = null;
+    lyricLines = null;
     titleView = null;
     columnView = null;
     removeOrientationEvent();
   }
 
   public void destroy() {
+    if (!onMainThread()) {
+      mainHandler.post(this::destroy);
+      return;
+    }
     destroyView();
     windowManager = null;
     layoutParams = null;

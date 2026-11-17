@@ -1,7 +1,7 @@
 // [BYD] 悬浮窗位置：水平/垂直按屏幕百分比调整（0-100，窗口左上角基准）。
 // 与百分比宽度/高度配合后，无需拖拽即可把悬浮窗放到屏幕任意位置；
 // 拖拽悬浮窗仍然有效，松手后保存的同样是百分比坐标。
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useRef, useState } from 'react'
 import { View } from 'react-native'
 
 import SubTitle from '../../components/SubTitle'
@@ -18,27 +18,36 @@ const usePositionSlider = (axis: 'x' | 'y') => {
   const x = useSettingValue('desktopLyric.position.x')
   const y = useSettingValue('desktopLyric.position.y')
   const value = axis === 'x' ? x : y
+  const xRef = useRef(x)
+  const yRef = useRef(y)
+  xRef.current = x
+  yRef.current = y
   const [sliderSize, setSliderSize] = useState(value)
   const [isSliding, setSliding] = useState(false)
+  const slidingRef = useRef(false)
+
+  const pushPosition = useCallback((v: number) => {
+    const position = { x: axis === 'x' ? v : xRef.current, y: axis === 'y' ? v : yRef.current }
+    void setDesktopLyricPositionPercent(position.x, position.y)
+    return position
+  }, [axis])
 
   const handleSlidingStart = useCallback<NonNullable<SliderProps['onSlidingStart']>>(() => {
+    slidingRef.current = true
     setSliding(true)
   }, [])
   const handleValueChange = useCallback<NonNullable<SliderProps['onValueChange']>>(v => {
     setSliderSize(v)
-  }, [])
+    // 只在手指拖动时跟手，避免设置回写触发又一次定位
+    if (!slidingRef.current) return
+    pushPosition(v)
+  }, [pushPosition])
   const handleSlidingComplete = useCallback<NonNullable<SliderProps['onSlidingComplete']>>(v => {
-    if (value == v) {
-      setSliding(false)
-      return
-    }
-    const position = { x: axis === 'x' ? v : x, y: axis === 'y' ? v : y }
-    void setDesktopLyricPositionPercent(position.x, position.y).then(() => {
-      updateSetting({ 'desktopLyric.position.x': position.x, 'desktopLyric.position.y': position.y })
-    }).finally(() => {
-      setSliding(false)
-    })
-  }, [axis, x, y, value])
+    slidingRef.current = false
+    const position = pushPosition(v)
+    void updateSetting({ 'desktopLyric.position.x': position.x, 'desktopLyric.position.y': position.y })
+    setSliding(false)
+  }, [pushPosition])
 
   return { value, sliderSize, isSliding, handleSlidingStart, handleValueChange, handleSlidingComplete }
 }
@@ -58,7 +67,7 @@ const PositionSlider = ({ axis, title }: { axis: 'x' | 'y', title: string }) => 
           onValueChange={handleValueChange}
           onSlidingStart={handleSlidingStart}
           step={1}
-          value={value}
+          value={isSliding ? sliderSize : value}
         />
       </View>
     </SubTitle>

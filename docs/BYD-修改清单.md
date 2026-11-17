@@ -28,7 +28,7 @@
 | `.github/workflows/release.yml` | 关闭上游自动出包：`on.push` 改为 `workflow_dispatch`，避免按 package.json 版本号抢先建同名 tag/Release 与 `byd-release.yml` 撞车 | YAML 注释 `[BYD]` | 冲突时保留 `workflow_dispatch` 触发方式 |
 | `src/utils/version.js` | 更新源整体改为公共分发仓 `LuckyLearning/Release` 的 `LxMusic/latest.json`（多镜像），下载按清单 `assets` 选 ABI | 文件头 `[BYD]` 块 | 上游对本文件的改动**不保留**，以本实现为准 |
 | `src/screens/Home/Views/Setting/settings/About.tsx` | 开源地址/反馈 Issue/最新版下载页指向本 fork 与公共分发仓（FAQ 与许可协议仍指上游） | `// [BYD]` 注释 | 保留四处链接改动 |
-| `android/.../lyric/LyricView.java` 等 lyric 包 | v0.0.3：悬浮窗 FrameLayout 容器（背景与文字透明度解耦、锁定仍保留背景）、当前行/其它行分色分字号、内置空心字 2 套、歌名/歌手标题、无翻译时下一行补位 | `// [BYD]` 注释 | 保留全部 `[BYD]` 块；`StrokeTextView` / `TitleOptions` 为新增零冲突 |
+| `android/.../lyric/LyricView.java` 等 lyric 包 | v0.0.3：悬浮窗 FrameLayout 容器（背景与文字透明度解耦、锁定仍保留背景）、当前行/其它行分色分字号、内置空心字 2 套、歌名/歌手标题、无翻译时按最大行数补后续歌词；拖动按帧合并并关闭窗口位移动画；多行歌词整列联动滚动 | `// [BYD]` 注释 | 保留全部 `[BYD]` 块；`StrokeTextView` / `LyricLinesView` / `LyricStroke` / `TitleOptions` 为新增零冲突 |
 | `package.json` | `version`=`0.0.1`、`versionCode`=`1`（车机适配线，与上游 `1.9.x` 解耦） | — | 上游升版本时**保留**本 fork 的 0.0.x，上游 `1.9.x` 只记入基线说明 |
 | `src/types/theme.d.ts` | `ActiveTheme` 交叉 `DesignTokens` 类型 | TS 注释 `[BYD]` | 保留 `& DesignTokens` |
 | `src/utils/pixelRatio.ts` | 追加 `px()`/`sp()`（车机 1920×1080 设计稿换算） | `// [BYD]` 块 | 追加块整体保留，上游函数不动 |

@@ -25,7 +25,10 @@ export default memo(() => {
     setSliderSize(value)
   }, [])
   const handleSlidingComplete = useCallback<NonNullable<SliderProps['onSlidingComplete']>>(value => {
-    if (width == value) return
+    if (width == value) {
+      setSliding(false)
+      return
+    }
     void setDesktopLyricWidth(value).then(() => {
       updateSetting({ 'desktopLyric.width': value })
     }).finally(() => {
@@ -44,7 +47,7 @@ export default memo(() => {
           onValueChange={handleValueChange}
           onSlidingStart={handleSlidingStart}
           step={1}
-          value={width}
+          value={isSliding ? sliderSize : width}
         />
       </View>
     </SubTitle>
