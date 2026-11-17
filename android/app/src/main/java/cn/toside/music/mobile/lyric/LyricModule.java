@@ -257,6 +257,13 @@ public class LyricModule extends ReactContextBaseJavaModule {
     promise.resolve(null);
   }
 
+  // [BYD] 当前行 / 其它行 / 标题行各自的字号、对齐、字距、加粗、空心
+  @ReactMethod
+  public void setLineStyles(ReadableMap data, Promise promise) {
+    if (lyric != null && data != null) lyric.setLineStyles(Arguments.toBundle(data));
+    promise.resolve(null);
+  }
+
   @ReactMethod
   public void checkOverlayPermission(Promise promise) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(reactContext)) {

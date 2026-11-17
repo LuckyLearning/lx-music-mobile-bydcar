@@ -1,4 +1,5 @@
 import { compareVer } from '@/utils'
+import migrateDesktopLyricStyle from './migrateDesktopLyric'
 
 export default (setting: any): Partial<LX.AppSetting> => {
   setting = { ...setting }
@@ -57,5 +58,5 @@ export default (setting: any): Partial<LX.AppSetting> => {
     }
   }
 
-  return setting
+  return migrateDesktopLyricStyle(setting)
 }

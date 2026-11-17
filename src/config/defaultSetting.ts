@@ -52,7 +52,9 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.position.y': 0,
   'desktopLyric.textPosition.x': 'left',
   'desktopLyric.textPosition.y': 'top',
-  'desktopLyric.style.fontSize': 180,
+  // 字号单位是磅。18 磅对应旧滑块 180（原生 18sp），升级时不会突然变大或变小。
+  'desktopLyric.style.fontSize': 18,
+  'desktopLyric.style.fontUnit': 'pt',
   'desktopLyric.style.opacity': 100,
   // 当前行 / 其它行默认色区分
   'desktopLyric.style.lyricUnplayColor': 'rgba(255, 255, 255, 0.55)',
@@ -67,11 +69,23 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.style.bold': false,
   'desktopLyric.style.hollowStyle': 0,
   'desktopLyric.style.hollowSize': 4,
-  'desktopLyric.style.otherFontSize': 140,
+  'desktopLyric.style.otherFontSize': 14,
+  // 其它行以前跟当前行共用这些项；空心大小按旧绘制的 0.75 记下来，打开空心时粗细不变。
+  'desktopLyric.style.otherAlign': 'left',
+  'desktopLyric.style.otherLetterSpacing': 0,
+  'desktopLyric.style.otherBold': false,
+  'desktopLyric.style.otherHollowStyle': 0,
+  'desktopLyric.style.otherHollowSize': 3,
   'desktopLyric.title.mode': 'none',
   'desktopLyric.title.position': 'above',
   'desktopLyric.title.align': 'left',
   'desktopLyric.title.color': 'rgba(255, 255, 255, 0.85)',
+  // 标题以前是其它行的 0.95 倍、字距一半、并且始终加粗。
+  'desktopLyric.title.fontSize': 13,
+  'desktopLyric.title.letterSpacing': 0,
+  'desktopLyric.title.bold': true,
+  'desktopLyric.title.hollowStyle': 0,
+  'desktopLyric.title.hollowSize': 3,
   // [BYD] 窗口高度占屏幕高度百分比（0 = 按行数自适应）
   'desktopLyric.height': 0,
   'desktopLyric.displayId': -1,

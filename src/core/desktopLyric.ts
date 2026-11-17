@@ -31,6 +31,7 @@ import {
   setLyricStyle,
   setMusicMeta,
   setTitleOptions,
+  setLineStyles,
 } from '@/utils/nativeModules/lyricDesktop'
 import settingState from '@/store/setting/state'
 import playerState from '@/store/player/state'
@@ -72,11 +73,16 @@ export const showDesktopLyric = async() => {
     bgRadius: setting['desktopLyric.style.bgRadius'],
     borderColor: setting['desktopLyric.style.borderColor'],
     borderWidth: setting['desktopLyric.style.borderWidth'],
-    // 滑块存的是 0-50，原生 letterSpacing 是 em，实时调节走的是 /100
+    // 滑块存的是 0-50，原生 letterSpacing 是 em。打开窗口和实时调节都除以 100，不要改这一档。
     letterSpacing: setting['desktopLyric.style.letterSpacing'] / 100,
     bold: setting['desktopLyric.style.bold'],
     hollowStyle: setting['desktopLyric.style.hollowStyle'],
     hollowSize: setting['desktopLyric.style.hollowSize'],
+    otherAlign: setting['desktopLyric.style.otherAlign'],
+    otherLetterSpacing: setting['desktopLyric.style.otherLetterSpacing'] / 100,
+    otherBold: setting['desktopLyric.style.otherBold'],
+    otherHollowStyle: setting['desktopLyric.style.otherHollowStyle'],
+    otherHollowSize: setting['desktopLyric.style.otherHollowSize'],
     height: setting['desktopLyric.height'],
     displayId: setting['desktopLyric.displayId'],
     musicName: meta.musicName,
@@ -85,6 +91,11 @@ export const showDesktopLyric = async() => {
     titlePosition: setting['desktopLyric.title.position'],
     titleAlign: setting['desktopLyric.title.align'],
     titleColor: setting['desktopLyric.title.color'],
+    titleTextSize: setting['desktopLyric.title.fontSize'],
+    titleLetterSpacing: setting['desktopLyric.title.letterSpacing'] / 100,
+    titleBold: setting['desktopLyric.title.bold'],
+    titleHollowStyle: setting['desktopLyric.title.hollowStyle'],
+    titleHollowSize: setting['desktopLyric.title.hollowSize'],
   })
   let lrc = playerState.musicInfo.lrc ?? ''
   let tlrc = playerState.musicInfo.tlrc ?? ''
@@ -169,6 +180,57 @@ export const setDesktopLyricStyle = async(bold?: boolean, hollowStyle?: number, 
 export const setDesktopLyricMusicMeta = async(name?: string, singer?: string) => {
   const meta = readMusicMeta()
   return setMusicMeta(name ?? meta.musicName, singer ?? meta.musicSinger)
+}
+
+type Align = 'left' | 'center' | 'right'
+type Hollow = 0 | 1 | 2
+
+export interface LyricRoleStylePatch {
+  fontSize?: number
+  align?: Align
+  letterSpacing?: number
+  bold?: boolean
+  hollowStyle?: Hollow
+  hollowSize?: number
+  otherFontSize?: number
+  otherAlign?: Align
+  otherLetterSpacing?: number
+  otherBold?: boolean
+  otherHollowStyle?: Hollow
+  otherHollowSize?: number
+  titleFontSize?: number
+  titleAlign?: Align
+  titleLetterSpacing?: number
+  titleBold?: boolean
+  titleHollowStyle?: Hollow
+  titleHollowSize?: number
+}
+
+const pointSize = (size: number) => Math.max(1, Math.round(size))
+
+/** 把三行样式整包推到悬浮窗。没传的字段用当前设置，字距仍按 /100 换成 em。 */
+export const pushDesktopLyricLineStyles = async(patch: LyricRoleStylePatch = {}) => {
+  const s = settingState.setting
+  return setLineStyles({
+    textSize: pointSize(patch.fontSize ?? s['desktopLyric.style.fontSize']),
+    textX: (patch.align ?? s['desktopLyric.textPosition.x']).toUpperCase(),
+    letterSpacing: (patch.letterSpacing ?? s['desktopLyric.style.letterSpacing']) / 100,
+    bold: patch.bold ?? s['desktopLyric.style.bold'],
+    hollowStyle: patch.hollowStyle ?? s['desktopLyric.style.hollowStyle'],
+    hollowSize: patch.hollowSize ?? s['desktopLyric.style.hollowSize'],
+    otherTextSize: pointSize(patch.otherFontSize ?? s['desktopLyric.style.otherFontSize']),
+    otherAlign: (patch.otherAlign ?? s['desktopLyric.style.otherAlign']).toUpperCase(),
+    otherLetterSpacing: (patch.otherLetterSpacing ?? s['desktopLyric.style.otherLetterSpacing']) / 100,
+    otherBold: patch.otherBold ?? s['desktopLyric.style.otherBold'],
+    otherHollowStyle: patch.otherHollowStyle ?? s['desktopLyric.style.otherHollowStyle'],
+    otherHollowSize: patch.otherHollowSize ?? s['desktopLyric.style.otherHollowSize'],
+    titleTextSize: pointSize(patch.titleFontSize ?? s['desktopLyric.title.fontSize']),
+    titleAlign: patch.titleAlign ?? s['desktopLyric.title.align'],
+    titleLetterSpacing: (patch.titleLetterSpacing ?? s['desktopLyric.title.letterSpacing']) / 100,
+    titleBold: patch.titleBold ?? s['desktopLyric.title.bold'],
+    titleHollowStyle: patch.titleHollowStyle ?? s['desktopLyric.title.hollowStyle'],
+    titleHollowSize: patch.titleHollowSize ?? s['desktopLyric.title.hollowSize'],
+  })
 }
 
 /** 标题显示选项 */

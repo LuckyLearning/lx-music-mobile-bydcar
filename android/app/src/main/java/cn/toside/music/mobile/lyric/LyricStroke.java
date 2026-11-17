@@ -4,7 +4,7 @@ import android.graphics.Color;
 import android.view.View;
 
 /**
- * [BYD] 当前行 / 其它行共用的空心字参数。
+ * [BYD] 空心字参数。字号、样式、描边大小由每一行自己传入，这里不再按当前行 / 其它行打折。
  * 描边色再乘一次文字透明度，避免整窗 setAlpha 把背景一起淡掉。
  */
 final class LyricStroke {
@@ -19,9 +19,9 @@ final class LyricStroke {
     return (color & 0x00FFFFFF) | (a << 24);
   }
 
-  static void apply(View view, int hollowStyle, float hollowSize, boolean isCurrent, float alpha) {
+  static void apply(View view, int hollowStyle, float hollowSize, float alpha) {
     if (view == null) return;
-    float size = Math.max(0f, hollowSize) * (isCurrent ? 1f : 0.75f);
+    float size = Math.max(0f, hollowSize);
     int strokeColor = Color.TRANSPARENT;
     float strokeWidth = 0f;
     boolean hollow = false;

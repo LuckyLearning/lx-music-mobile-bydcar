@@ -2,6 +2,7 @@ import { storageDataPrefix, storageDataPrefixOld } from '@/config/constant'
 import defaultSetting from '@/config/defaultSetting'
 import { getData, removeData, saveData } from '@/plugins/storage'
 import migrateSetting from './migrateSetting'
+import migrateDesktopLyricStyle from './migrateDesktopLyric'
 import settingState from '@/store/setting/state'
 import { migrateMetaData, migrateListData } from './migrate'
 import { exitApp, tipDialog } from '@/utils/tools'
@@ -102,6 +103,9 @@ export const initSetting = async() => {
       await removeData(storageDataPrefixOld.setting)
     }
   }
+
+  // 在跟默认值合并之前迁移，否则 fontUnit 的默认值会挡住旧字号除以 10。
+  if (setting) setting = migrateDesktopLyricStyle(setting)
 
   // console.log(setting)
   const updatedSetting = updateSetting(setting, true)

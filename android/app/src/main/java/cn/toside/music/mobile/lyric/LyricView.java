@@ -89,9 +89,15 @@ public class LyricView extends Activity implements View.OnTouchListener {
   private float borderWidth = 0f;
   private float letterSpacing = 0f;
   // [BYD] 加粗 + 内置空心字样式（0=关 / 1=细描边空心 / 2=电影字幕空心）
+  // 当前行、其它行、标题行各自一份，不再互相打折。
   private boolean bold = false;
   private int hollowStyle = 0;
   private float hollowSize = 4f;
+  private String otherAlign = "LEFT";
+  private float otherLetterSpacing = 0f;
+  private boolean otherBold = false;
+  private int otherHollowStyle = 0;
+  private float otherHollowSize = 3f;
   private float heightPercentage = 0f;
   private int targetDisplayId = android.view.Display.DEFAULT_DISPLAY;
   private String textX = "LEFT";
@@ -114,6 +120,11 @@ public class LyricView extends Activity implements View.OnTouchListener {
   private String titlePosition = "above"; // above | below
   private String titleAlign = "left"; // left | center | right
   private String titleColor = "rgba(255, 255, 255, 0.85)";
+  private float titleTextSize = 13f;
+  private float titleLetterSpacing = 0f;
+  private boolean titleBold = true;
+  private int titleHollowStyle = 0;
+  private float titleHollowSize = 3f;
 
   private int mLastRotation;
   private OrientationEventListener orientationEventListener = null;
@@ -336,6 +347,48 @@ public class LyricView extends Activity implements View.OnTouchListener {
     return fallback;
   }
 
+  private static float atLeastOne(double value) {
+    return Math.max(1f, (float) value);
+  }
+
+  /**
+   * 当前行 / 其它行 / 标题行各自的字号、对齐、字距、加粗、空心。
+   * legacyFallback 只在打开悬浮窗时使用：旧数据没有独立字段时，按升级前实际画出来的效果补上。
+   */
+  private void readRoleStyles(Bundle options, boolean legacyFallback) {
+    if (options == null) return;
+    if (options.containsKey("textX")) textX = options.getString("textX", textX);
+    if (options.containsKey("textSize")) textSize = atLeastOne(readNum(options, "textSize", textSize));
+    if (options.containsKey("otherTextSize")) otherTextSize = atLeastOne(readNum(options, "otherTextSize", otherTextSize));
+    if (options.containsKey("letterSpacing")) letterSpacing = (float) readNum(options, "letterSpacing", letterSpacing);
+    if (options.containsKey("bold")) bold = options.getBoolean("bold", bold);
+    if (options.containsKey("hollowStyle")) hollowStyle = (int) readNum(options, "hollowStyle", hollowStyle);
+    if (options.containsKey("hollowSize")) hollowSize = (float) readNum(options, "hollowSize", hollowSize);
+
+    if (options.containsKey("otherAlign")) otherAlign = options.getString("otherAlign", otherAlign);
+    else if (legacyFallback) otherAlign = textX;
+    if (options.containsKey("otherLetterSpacing")) otherLetterSpacing = (float) readNum(options, "otherLetterSpacing", otherLetterSpacing);
+    else if (legacyFallback) otherLetterSpacing = letterSpacing;
+    if (options.containsKey("otherBold")) otherBold = options.getBoolean("otherBold", otherBold);
+    else if (legacyFallback) otherBold = bold;
+    if (options.containsKey("otherHollowStyle")) otherHollowStyle = (int) readNum(options, "otherHollowStyle", otherHollowStyle);
+    else if (legacyFallback) otherHollowStyle = hollowStyle;
+    if (options.containsKey("otherHollowSize")) otherHollowSize = (float) readNum(options, "otherHollowSize", otherHollowSize);
+    else if (legacyFallback) otherHollowSize = hollowSize * 0.75f;
+
+    if (options.containsKey("titleAlign")) titleAlign = options.getString("titleAlign", titleAlign);
+    if (options.containsKey("titleTextSize")) titleTextSize = atLeastOne(readNum(options, "titleTextSize", titleTextSize));
+    else if (legacyFallback) titleTextSize = Math.max(10f, otherTextSize * 0.95f);
+    if (options.containsKey("titleLetterSpacing")) titleLetterSpacing = (float) readNum(options, "titleLetterSpacing", titleLetterSpacing);
+    else if (legacyFallback) titleLetterSpacing = letterSpacing * 0.5f;
+    if (options.containsKey("titleBold")) titleBold = options.getBoolean("titleBold", titleBold);
+    else if (legacyFallback) titleBold = true;
+    if (options.containsKey("titleHollowStyle")) titleHollowStyle = (int) readNum(options, "titleHollowStyle", titleHollowStyle);
+    else if (legacyFallback) titleHollowStyle = hollowStyle;
+    if (options.containsKey("titleHollowSize")) titleHollowSize = (float) readNum(options, "titleHollowSize", titleHollowSize);
+    else if (legacyFallback) titleHollowSize = hollowSize * 0.75f;
+  }
+
   public void showLyricView(Bundle options) {
     if (!onMainThread()) {
       mainHandler.post(() -> showLyricView(options));
@@ -357,22 +410,16 @@ public class LyricView extends Activity implements View.OnTouchListener {
     shadowColor = options.getString("shadowColor", shadowColor);
     prevViewPercentageX = (float) readNum(options, "lyricViewX", 0) / 100f;
     prevViewPercentageY = (float) readNum(options, "lyricViewY", 0) / 100f;
-    textX = options.getString("textX", textX);
     textY = options.getString("textY", textY);
     alpha = (float) readNum(options, "alpha", alpha);
-    textSize = (float) readNum(options, "textSize", textSize);
-    otherTextSize = (float) readNum(options, "otherTextSize", otherTextSize);
     widthPercentage = (float) readNum(options, "width", 100) / 100f;
     maxLineNum = (int) readNum(options, "maxLineNum", maxLineNum);
     bgColor = options.getString("bgColor", bgColor);
     bgRadius = (float) readNum(options, "bgRadius", bgRadius);
     borderColor = options.getString("borderColor", borderColor);
     borderWidth = (float) readNum(options, "borderWidth", borderWidth);
-    letterSpacing = (float) readNum(options, "letterSpacing", letterSpacing);
-    bold = options.getBoolean("bold", bold);
-    hollowStyle = (int) readNum(options, "hollowStyle", hollowStyle);
-    hollowSize = (float) readNum(options, "hollowSize", hollowSize);
     heightPercentage = (float) readNum(options, "height", 0) / 100f;
+    readRoleStyles(options, true);
     targetDisplayId = (int) readNum(options, "displayId", targetDisplayId);
     // 兼容旧包把 -1 当主屏
     if (targetDisplayId < 0) targetDisplayId = Display.DEFAULT_DISPLAY;
@@ -381,7 +428,6 @@ public class LyricView extends Activity implements View.OnTouchListener {
     musicSinger = options.getString("musicSinger", musicSinger);
     titleMode = options.getString("titleMode", titleMode);
     titlePosition = options.getString("titlePosition", titlePosition);
-    titleAlign = options.getString("titleAlign", titleAlign);
     titleColor = options.getString("titleColor", titleColor);
 
     handleShowLyric();
@@ -402,26 +448,49 @@ public class LyricView extends Activity implements View.OnTouchListener {
     listenOrientationEvent();
   }
 
+  /** CSS #RRGGBBAA（以及 #RGBA）转成 Android 的 #AARRGGBB。半截或不合法的值不抛异常。 */
+  private static String cssHexToAndroid(String raw) {
+    String body = raw.charAt(0) == '#' ? raw.substring(1) : raw;
+    if (body.length() == 3 || body.length() == 4) {
+      StringBuilder expanded = new StringBuilder(body.length() * 2);
+      for (int i = 0; i < body.length(); i++) {
+        expanded.append(body.charAt(i)).append(body.charAt(i));
+      }
+      body = expanded.toString();
+    }
+    if (body.length() == 8) return "#" + body.substring(6, 8) + body.substring(0, 6);
+    return "#" + body;
+  }
+
   public static int parseColor(String input) {
     if (input == null || input.length() == 0) return Color.BLACK;
-    if (input.startsWith("#")) {
+    String value = input.trim();
+    if (value.startsWith("#")) {
       try {
-        return Color.parseColor(input);
+        return Color.parseColor(cssHexToAndroid(value));
       } catch (Exception e) {
         return Color.BLACK;
       }
     }
-    Pattern c = Pattern.compile("rgba? *\\( *(\\d+), *(\\d+), *(\\d+)(?:, *([\\d.]+))? *\\)");
-    Matcher m = c.matcher(input);
-    if (m.matches()) {
-      int red = Integer.parseInt(m.group(1));
-      int green = Integer.parseInt(m.group(2));
-      int blue = Integer.parseInt(m.group(3));
-      float a = 1;
-      if (m.group(4) != null) a = Float.parseFloat(m.group(4));
-      return Color.argb((int) (a * 255), red, green, blue);
+    try {
+      Pattern c = Pattern.compile("rgba? *\\( *(\\d+), *(\\d+), *(\\d+)(?:, *([\\d.]+))? *\\)");
+      Matcher m = c.matcher(value);
+      if (m.matches()) {
+        int red = Integer.parseInt(m.group(1));
+        int green = Integer.parseInt(m.group(2));
+        int blue = Integer.parseInt(m.group(3));
+        float a = 1;
+        if (m.group(4) != null) a = Float.parseFloat(m.group(4));
+        return Color.argb((int) (a * 255), red, green, blue);
+      }
+    } catch (Exception e) {
+      return Color.BLACK;
     }
-    return Color.parseColor("#000000");
+    try {
+      return Color.parseColor("#000000");
+    } catch (Exception e) {
+      return Color.BLACK;
+    }
   }
 
   /** 把全局文字透明度叠到颜色上（不改 View.setAlpha，以免背景跟着淡） */
@@ -461,7 +530,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
       textView.setShadowColor(withTextAlpha(parseColor(shadowColor)));
       textView.setLetterSpacings(letterSpacing);
       textView.setTextSize(textSize);
-      LyricStroke.apply(textView, hollowStyle, hollowSize, true, alpha);
+      LyricStroke.apply(textView, hollowStyle, hollowSize, alpha);
     }
 
     if (lyricLines != null) {
@@ -472,20 +541,23 @@ public class LyricView extends Activity implements View.OnTouchListener {
         textSize,
         otherTextSize,
         letterSpacing,
+        otherLetterSpacing,
         bold,
+        otherBold,
         hollowStyle,
+        otherHollowStyle,
         hollowSize,
+        otherHollowSize,
         alpha
       );
     }
 
     if (titleView != null) {
-      titleView.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+      titleView.setTypeface(titleBold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
       titleView.setTextColor(withTextAlpha(parseColor(titleColor)));
-      titleView.setTextSize(Math.max(10f, otherTextSize * 0.95f));
-      titleView.setLetterSpacing(letterSpacing * 0.5f);
-      // 标题跟随空心样式，但更细一点
-      LyricStroke.apply(titleView, hollowStyle, hollowSize, false, alpha);
+      titleView.setTextSize(Math.max(1f, titleTextSize));
+      titleView.setLetterSpacing(titleLetterSpacing);
+      LyricStroke.apply(titleView, titleHollowStyle, titleHollowSize, alpha);
     }
   }
 
@@ -583,9 +655,10 @@ public class LyricView extends Activity implements View.OnTouchListener {
   }
 
   private void applyLyricGravity() {
-    int h = resolveHorizGravity(textX);
-    if (textView != null) textView.setGravity(h | Gravity.CENTER_VERTICAL);
-    if (lyricLines != null) lyricLines.setGravity(h);
+    int current = resolveHorizGravity(textX);
+    int other = resolveHorizGravity(otherAlign);
+    if (textView != null) textView.setGravity(current | Gravity.CENTER_VERTICAL);
+    if (lyricLines != null) lyricLines.setGravities(current, other);
     if (titleView != null) titleView.setGravity(resolveHorizGravity(titleAlign) | Gravity.CENTER_VERTICAL);
     if (columnView != null && columnView.getLayoutParams() instanceof FrameLayout.LayoutParams) {
       FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) columnView.getLayoutParams();
@@ -914,7 +987,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
       mainHandler.post(() -> setTextSize(size));
       return;
     }
-    this.textSize = size;
+    this.textSize = Math.max(1f, size);
     if (rootView == null) return;
     applyTextStyles();
     setLayoutParamsHeight();
@@ -926,7 +999,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
       mainHandler.post(() -> setOtherTextSize(size));
       return;
     }
-    this.otherTextSize = size;
+    this.otherTextSize = Math.max(1f, size);
     if (rootView == null) return;
     applyTextStyles();
     setLayoutParamsHeight();
@@ -989,7 +1062,7 @@ public class LyricView extends Activity implements View.OnTouchListener {
     commitLayout();
   }
 
-  /** [BYD] 加粗 + 内置空心样式 + 空心大小；其它行同步区分大小 */
+  /** [BYD] 当前行：加粗 / 内置空心样式 / 空心大小。其它行和标题行各自单独设置。 */
   public void setLyricStyle(boolean isBold, int newHollowStyle, float newHollowSize) {
     if (!onMainThread()) {
       mainHandler.post(() -> setLyricStyle(isBold, newHollowStyle, newHollowSize));
@@ -1001,6 +1074,21 @@ public class LyricView extends Activity implements View.OnTouchListener {
     if (rootView == null) return;
     applyTextStyles();
     relayoutIfHeightChanged();
+  }
+
+  /** [BYD] 一次写入三行各自的字号、对齐、字距、加粗、空心。styles 不再被重新赋值，lambda 可以捕获。 */
+  public void setLineStyles(Bundle styles) {
+    if (!onMainThread()) {
+      mainHandler.post(() -> setLineStyles(styles));
+      return;
+    }
+    readRoleStyles(styles, false);
+    if (rootView == null) return;
+    applyTextStyles();
+    applyLyricGravity();
+    applyTitleText();
+    setLayoutParamsHeight();
+    commitLayout();
   }
 
   public void setTargetDisplay(int displayId) {
