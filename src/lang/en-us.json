@@ -364,6 +364,8 @@
   "setting_play_show_roma": "Show romanized lyrics if available",
   "setting_play_show_translation": "Show translated lyrics if available",
   "setting_player": "Playback",
+  "setting_player_car_layout": "Car layout",
+  "setting_player_car_layout_tip": "When on, the landscape player shows lyrics on the left (title and artist stay pinned), a square cover on the right, and playback controls along the bottom, with space reserved for the system dock. Portrait always keeps the current player. When off, landscape keeps the current player too.",
   "setting_player_save_play_time": "Remember playback progress",
   "setting_search": "Search",
   "setting_search_show_history_search": "Enable Search History",

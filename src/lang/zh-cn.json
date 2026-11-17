@@ -364,6 +364,8 @@
   "setting_play_show_roma": "显示歌词罗马音（如果可用）",
   "setting_play_show_translation": "显示歌词翻译（如果可用）",
   "setting_player": "播放设置",
+  "setting_player_car_layout": "车机布局",
+  "setting_player_car_layout_tip": "开启后，横屏播放页改为左侧歌词（歌名与歌手固定在上方）、右侧方形封面，底部为播放控制，并留出系统 Dock。竖屏仍使用原来的播放页。关闭时横屏也保持现有播放页。",
   "setting_player_save_play_time": "记住播放进度",
   "setting_search": "搜索设置",
   "setting_search_show_history_search": "显示历史搜索记录",

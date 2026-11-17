@@ -34,6 +34,8 @@ const defaultSetting: LX.AppSetting = {
   'player.isS2t': false,
   'player.isShowBluetoothLyric': false,
   'player.isShowBluetoothFullLyric': false,
+  // [BYD] 横屏车机播放页。默认关闭；竖屏始终用原来的播放页。
+  'player.carLayout': false,
 
   // 'playDetail.isZoomActiveLrc': false,
   // 'playDetail.isShowLyricProgressSetting': false,

@@ -71,7 +71,12 @@ const LrcLine = memo(({ line, lineNum, activeLine, onLayout }: LineProps) => {
 })
 const wait = async() => new Promise(resolve => setTimeout(resolve, 100))
 
-export default () => {
+interface LyricProps {
+  /** 用户拖动歌词时通知外部（自动跟行不计入） */
+  onInteraction?: () => void
+}
+
+export default ({ onInteraction }: LyricProps) => {
   const lyricLines = useLrcSet()
   const { line } = useLrcPlay()
   const flatListRef = useRef<FlatList>(null)
@@ -133,9 +138,11 @@ export default () => {
     scrollInfoRef.current = nativeEvent
     if (isPauseScrollRef.current) {
       playLineRef.current?.updateScrollInfo(nativeEvent)
+      onInteraction?.()
     }
   }
   const handleScrollBeginDrag = () => {
+    onInteraction?.()
     isPauseScrollRef.current = true
     playLineRef.current?.setVisible(true)
     if (delayScrollTimeout.current) {
@@ -153,6 +160,7 @@ export default () => {
   }
 
   const onScrollEndDrag = () => {
+    onInteraction?.()
     if (!isPauseScrollRef.current) return
     if (scrollTimoutRef.current) clearTimeout(scrollTimoutRef.current)
     scrollTimoutRef.current = setTimeout(() => {
