@@ -93,7 +93,7 @@
 | 上游基线 | LX Music `v1.9.2`（`0669d1b`） |
 | 出包方式 | 打 tag `v0.0.1` → `[BYD] Build & Release` 工作流 → GitHub Release 挂 5 个 APK |
 | 发布形态 | 与 WindTone 一致：源码仓 Release 挂产物；**公共分发仓** `LuckyLearning/Release/LxMusic/`（`latest.json` + 版本目录，保留最近 5 版）供应用内更新与直链下载 |
-| 更新检查 | 应用内读 `LxMusic/latest.json`（jsDelivr → gh-proxy → ghproxy.net → 官方 raw），下载按设备 ABI 选包 |
+| 更新检查 | 优先读源码仓 GitHub Releases（`/releases` 的 tag、说明、APK）；失败再读 `LxMusic/latest.json`。下载按 ABI 选 Release 附件 |
 | 签名兜底 | 未配置 `KEYSTORE_BASE64` 时降级用仓库内 `android/app/debug.keystore`（`androiddebugkey` / `android`） |
 
 版本号语义：`0.0.x` 为车机适配线，与上游 `1.9.x` 版本号解耦；后续合入上游更新时只更新基线说明，不动本版本号。

@@ -1,7 +1,10 @@
 // ==================================================================
-// [BYD] 公共分发仓库 —— 应用内「检查更新 / 下载安装包」的唯一来源
+// [BYD] 应用内更新来源
 //
-// 约定与 WindTone 完全一致（同一批公共仓库、同一套目录规范）：
+// 优先：源码仓 GitHub Releases
+//   https://api.github.com/repos/LuckyLearning/lx-music-mobile-bydcar/releases
+//   版本号、更新说明、APK 都从 Release 附件读。
+// 兜底：公共分发仓 latest.json（jsDelivr → 代理 → raw），目录约定与 WindTone 一致：
 //
 //   LuckyLearning/Release/
 //     LxMusic/
@@ -18,6 +21,9 @@
 export const RELEASE_OWNER = 'LuckyLearning'
 export const RELEASE_REPO = 'Release'
 export const RELEASE_BRANCH = 'main'
+/** 源码仓：应用内更新优先读这里的 GitHub Releases（tag / 说明 / APK） */
+export const SOURCE_OWNER = 'LuckyLearning'
+export const SOURCE_REPO = 'lx-music-mobile-bydcar'
 /** 本软件在公共仓里的目录名 */
 export const RELEASE_APP_DIR = 'LxMusic'
 
@@ -39,8 +45,28 @@ const githubUrls = (path: string): string[] => [
   `${RAW_BASE}/${path}`,
 ]
 
-/** 检查更新（latest.json）的候选线路，按可达性优先级排列 */
+/** 检查更新（latest.json）的候选线路，按可达性优先级排列。GitHub Releases 失败时才用。 */
 export const manifestUrls = (): string[] => githubUrls(releasePath('latest.json'))
+
+/** 源码仓 Releases 列表。官方 API 优先，代理兜底（国内经常打不开 api.github.com）。 */
+export const githubReleasesApiUrls = (): string[] => {
+  const api = `https://api.github.com/repos/${SOURCE_OWNER}/${SOURCE_REPO}/releases?per_page=10`
+  return [api, ...MIRROR_PREFIXES.map((prefix) => `${prefix}${api}`)]
+}
+
+export const SOURCE_RELEASES_PAGE = `https://github.com/${SOURCE_OWNER}/${SOURCE_REPO}/releases`
+
+/**
+ * 安装包下载线路：先下 GitHub Release 附件（browser_download_url），
+ * 再走代理，最后才是公共仓里的同一份文件。
+ */
+export const assetDownloadUrls = (version: string, asset: { file: string, browser_download_url?: string }): string[] => {
+  const direct = asset.browser_download_url
+    || `https://github.com/${SOURCE_OWNER}/${SOURCE_REPO}/releases/download/v${version}/${asset.file}`
+  const urls = [direct, ...MIRROR_PREFIXES.map((prefix) => `${prefix}${direct}`)]
+  urls.push(...releaseFileUrls(releasePath(`v${version}`, asset.file)))
+  return [...new Set(urls)]
+}
 
 /** 指定公共仓文件的下载线路（与清单线路同一优先级） */
 export const releaseFileUrls = (path: string): string[] => githubUrls(path)
