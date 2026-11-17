@@ -66,3 +66,11 @@ buck-out/
 
 # testing
 /coverage
+
+# ===== BYD car fork: 本地凭据与签名（绝不入库） =====
+.github-token
+.github-token.*
+*.jks
+*.keystore
+!debug.keystore
+.toolchain/

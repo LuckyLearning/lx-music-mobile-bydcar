@@ -1,0 +1,194 @@
+# [BYD] 比亚迪车机 fork 的独立出包工作流（新增文件，不修改上游 release.yml）
+#
+# 触发：
+#   - push 形如 v0.0.1 的 tag  → 构建 + 创建 GitHub Release（与 WindTone 一致：Release 挂 APK）
+#   - workflow_dispatch        → 只构建并上传 artifact，不建 Release
+#
+# 签名：与 WindTone 共用同一份 windtone.jks（SHA-256 75EA…7398）。
+#   Secrets 命名沿用 WindTone：KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD
+#   若未配置 KEYSTORE_BASE64，则降级用仓库内 debug.keystore 签名，保证仍能出可安装包。
+name: "[BYD] Build & Release"
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: byd-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 复用上游复合 Action：Node 18(.nvmrc) + JDK 17 + npm 缓存 + npm ci
+      - name: 配置构建环境
+        uses: ./.github/actions/setup
+
+      - name: 补装 Android SDK 组件
+        run: |
+          sdkmanager --install "platforms;android-36" "build-tools;35.0.0" "platform-tools" || \
+            echo "::warning::SDK 组件预装失败，交由 AGP 自动下载"
+
+      # ------------------------------------------------------------------ 版本号
+      - name: 读取版本号
+        id: ver
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          CODE=$(node -p "require('./package.json').versionCode")
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "本次构建：v$VERSION (versionCode $CODE)"
+
+      - name: 校验 tag 与 package.json 一致
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          FILE_VERSION="${{ steps.ver.outputs.name }}"
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "::error::tag($TAG_VERSION) 与 package.json version($FILE_VERSION) 不一致"
+            exit 1
+          fi
+
+      # ------------------------------------------------------------------ 签名
+      - name: 准备签名密钥
+        id: ks
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          STORE=byd-release.jks
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "android/app/$STORE"
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+            echo "store=$STORE" >> "$GITHUB_OUTPUT"
+            echo "::notice::使用 windtone.jks 正式签名"
+          else
+            echo "mode=debug" >> "$GITHUB_OUTPUT"
+            echo "store=debug.keystore" >> "$GITHUB_OUTPUT"
+            echo "::warning::未配置 secret KEYSTORE_BASE64，本次降级使用 debug.keystore 签名"
+          fi
+
+      # ------------------------------------------------------------------ 构建
+      - name: 构建 Release APK
+        env:
+          STORE: ${{ steps.ks.outputs.store }}
+          SIGN_MODE: ${{ steps.ks.outputs.mode }}
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          DISABLE_SVG: 1
+        run: |
+          cd android
+          if [ "$SIGN_MODE" = "release" ]; then
+            PASS="$STORE_PASSWORD"; ALIAS="$KEY_ALIAS"; KEYPASS="$KEY_PASSWORD"
+          else
+            PASS=android; ALIAS=androiddebugkey; KEYPASS=android
+          fi
+          ./gradlew assembleRelease \
+            -PMYAPP_UPLOAD_STORE_FILE="$STORE" \
+            -PMYAPP_UPLOAD_STORE_PASSWORD="$PASS" \
+            -PMYAPP_UPLOAD_KEY_ALIAS="$ALIAS" \
+            -PMYAPP_UPLOAD_KEY_PASSWORD="$KEYPASS" \
+            --stacktrace
+
+      - name: 清理密钥文件
+        if: always()
+        run: rm -f android/app/byd-release.jks
+
+      # ------------------------------------------------------------------ 产物
+      - name: 收集产物并计算校验值
+        id: apk
+        env:
+          SIGN_MODE: ${{ steps.ks.outputs.mode }}
+        run: |
+          mkdir -p dist
+          shopt -s nullglob
+          SRCS=(android/app/build/outputs/apk/release/*.apk)
+          if [ ${#SRCS[@]} -eq 0 ]; then
+            echo "::error::未找到 Release APK"
+            exit 1
+          fi
+          for f in "${SRCS[@]}"; do cp "$f" dist/; done
+
+          {
+            echo "### [BYD] 本次产物"
+            echo
+            if [ "$SIGN_MODE" = "release" ]; then
+              echo "签名：windtone.jks（SHA-256 75EA…7398）"
+            else
+              echo "签名：debug.keystore（未配置密钥，降级签名）"
+            fi
+            echo
+            echo "| 文件 | 大小 | SHA-256 |"
+            echo "| --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          : > dist/RELEASE-NOTES.md
+          {
+            echo "## 洛雪音乐·比亚迪车机版 v${{ steps.ver.outputs.name }}"
+            echo
+            echo "首个车机适配版本，基于上游 LX Music v1.9.2（同步基线 \`0669d1b\`）。"
+            echo
+            echo "### 本版内容"
+            echo
+            echo "- **车机横屏界面**：22 个车机组件 + 夜曲/白昼双主题 + Inter 字体，1920×1080 设计基准自适应缩放；手机竖屏界面保持上游原样。"
+            echo "- **三七分屏**：声明 \`BYD_SUPPORT_SPLIT_ACTIVITY\`（API≥32 生效）+ \`resizeableActivity\`，可在比亚迪车机 7 分屏中与导航共存。"
+            echo "- **悬浮歌词增强**：多屏识别与投射选择、背景色/圆角/边框色/边框宽/字间距/字体可调（滑块）、描边可读性、前台服务保活。"
+            echo
+            echo "### 安装说明"
+            echo
+            echo "- 首次安装请先卸载已安装的洛雪音乐（签名不同，无法覆盖安装）。"
+            echo "- 若已安装上游正式版，同样需卸载后再装本包。"
+            echo
+            echo "### 文件校验"
+            echo
+            echo "| 文件 | 大小 | SHA-256 |"
+            echo "| --- | --- | --- |"
+          } >> dist/RELEASE-NOTES.md
+
+          for f in dist/*.apk; do
+            n=$(basename "$f")
+            b=$(stat -c%s "$f")
+            s=$(sha256sum "$f" | cut -d' ' -f1)
+            printf '| `%s` | %s | `%s` |\n' "$n" "$b" "$s" >> dist/RELEASE-NOTES.md
+            printf '| `%s` | %s | `%s` |\n' "$n" "$b" "$s" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          {
+            echo
+            echo "签名模式：\`$SIGN_MODE\`"
+          } >> dist/RELEASE-NOTES.md
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: lx-music-bydcar-v${{ steps.ver.outputs.name }}
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # ------------------------------------------------------------------ Release
+      - name: 创建 GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: 洛雪音乐·比亚迪车机版 ${{ github.ref_name }}
+          body_path: dist/RELEASE-NOTES.md
+          files: dist/*.apk
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true

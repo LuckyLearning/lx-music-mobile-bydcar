@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- [BYD] 三七分屏：Android 12L（API 32）+ 才启用 7 分屏，覆盖车机新系统 -->
+    <integer name="byd_support_split_activity">1</integer>
+</resources>

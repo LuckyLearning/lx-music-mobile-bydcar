@@ -21,6 +21,11 @@ import {
   checkOverlayPermission,
   openOverlayPermissionActivity,
   onPositionChange,
+  // [BYD] 悬浮窗增强
+  setBackgroundStyle,
+  setLetterSpacing,
+  setTargetDisplay,
+  getDisplays,
 } from '@/utils/nativeModules/lyricDesktop'
 import settingState from '@/store/setting/state'
 import playerState from '@/store/player/state'
@@ -47,6 +52,14 @@ export const showDesktopLyric = async() => {
     positionY: setting['desktopLyric.position.y'],
     textPositionX: setting['desktopLyric.textPosition.x'],
     textPositionY: setting['desktopLyric.textPosition.y'],
+    // [BYD] 自定义样式与投屏屏
+    bgColor: setting['desktopLyric.style.bgColor'],
+    bgRadius: setting['desktopLyric.style.bgRadius'],
+    borderColor: setting['desktopLyric.style.borderColor'],
+    borderWidth: setting['desktopLyric.style.borderWidth'],
+    letterSpacing: setting['desktopLyric.style.letterSpacing'],
+    fontFamily: setting['desktopLyric.style.fontFamily'],
+    displayId: setting['desktopLyric.displayId'],
   })
   let lrc = playerState.musicInfo.lrc ?? ''
   let tlrc = playerState.musicInfo.tlrc ?? ''
@@ -93,6 +106,20 @@ export const setDesktopLyricTextPosition = async(x: LX.AppSetting['desktopLyric.
 export const checkDesktopLyricOverlayPermission = checkOverlayPermission
 export const openDesktopLyricOverlayPermissionActivity = openOverlayPermissionActivity
 export const onDesktopLyricPositionChange = onPositionChange
+
+// ===== [BYD] 悬浮窗自定义样式与多屏投射 =====
+export const setDesktopLyricBackground = async(bgColor?: string, bgRadius?: number, borderColor?: string, borderWidth?: number) => {
+  const s = settingState.setting
+  return setBackgroundStyle(
+    bgColor ?? s['desktopLyric.style.bgColor'],
+    bgRadius ?? s['desktopLyric.style.bgRadius'],
+    borderColor ?? s['desktopLyric.style.borderColor'],
+    borderWidth ?? s['desktopLyric.style.borderWidth'],
+  )
+}
+export const setDesktopLyricLetterSpacing = setLetterSpacing
+export const setDesktopLyricDisplay = setTargetDisplay
+export const getDesktopLyricDisplays = getDisplays
 
 
 export const showRemoteLyric = async(isSend: boolean) => {

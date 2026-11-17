@@ -6,6 +6,8 @@ import themeState from '@/store/theme/state'
 import { isUrl } from '@/utils'
 import { privateStorageDirectoryPath } from '@/utils/fs'
 import { type ImageSourcePropType } from 'react-native'
+// [BYD] 车机设计令牌注入主题
+import { CAR_THEME_IDS, buildDesignTokens, isCarTheme } from '@/theme/tokens'
 
 export const BG_IMAGES = {
   'china_ink.jpg': require('./images/china_ink.jpg') as ImageSourcePropType,
@@ -74,6 +76,8 @@ export const buildActiveThemeColors = (theme: LX.Theme): LX.ActiveTheme => {
     isDark: theme.isDark,
     ...theme.config.themeColors,
     ...theme.config.extInfo,
+    // [BYD] 注入车机设计令牌（夜曲/白昼取设计稿值，其他主题只替换强调色与文字色）
+    ...buildDesignTokens(theme),
     'c-font': theme.config.themeColors['c-850'],
     'c-font-label': theme.config.themeColors['c-450'],
     'c-primary-font': theme.config.themeColors['c-primary'],
@@ -117,9 +121,13 @@ export const getTheme = async() => {
   //     : settingState.setting['theme.lightId']
   //   // : 'china_ink'
   //   : settingState.setting['theme.id']
-  let themeId = settingState.setting['common.isAutoTheme'] && shouldUseDarkColors
-    ? 'black'
-    : settingState.setting['theme.id']
+  // [BYD] 自动主题：选中车机主题时在夜曲/白昼间切换，其他主题沿用原逻辑
+  const autoTheme = settingState.setting['common.isAutoTheme']
+  let themeId = settingState.setting['theme.id']
+  if (autoTheme) {
+    if (isCarTheme(themeId)) themeId = shouldUseDarkColors ? CAR_THEME_IDS.dark : CAR_THEME_IDS.light
+    else if (shouldUseDarkColors) themeId = 'black'
+  }
   // themeId = 'naruto'
   // themeId = 'pink'
   // themeId = 'black'
@@ -128,8 +136,9 @@ export const getTheme = async() => {
     userThemes = await getUserTheme()
     theme = userThemes.find(theme => theme.id == themeId)
     if (!theme) {
-      themeId = settingState.setting['theme.id'] == 'auto' && shouldUseDarkColors ? 'black' : 'green'
-      theme = themes.find(theme => theme.id == themeId) as LX.Theme
+      // [BYD] 兜底主题改为车机白昼/夜曲
+      const fallbackId = autoTheme && !shouldUseDarkColors ? CAR_THEME_IDS.light : CAR_THEME_IDS.dark
+      theme = themes.find(theme => theme.id == fallbackId) as LX.Theme
     }
   }
 

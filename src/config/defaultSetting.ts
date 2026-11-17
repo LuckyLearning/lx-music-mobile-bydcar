@@ -57,6 +57,14 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.style.lyricUnplayColor': 'rgba(255, 255, 255, 1)',
   'desktopLyric.style.lyricPlayedColor': 'rgba(7, 197, 86, 1)',
   'desktopLyric.style.lyricShadowColor': 'rgba(0, 0, 0, 0.6)',
+  // [BYD] 悬浮窗自定义样式（背景/边框/字距/字体/投屏屏）
+  'desktopLyric.style.bgColor': 'rgba(0, 0, 0, 0.35)',
+  'desktopLyric.style.bgRadius': 12,
+  'desktopLyric.style.borderColor': 'rgba(255, 255, 255, 0.2)',
+  'desktopLyric.style.borderWidth': 0,
+  'desktopLyric.style.letterSpacing': 0,
+  'desktopLyric.style.fontFamily': '',
+  'desktopLyric.displayId': -1,
 
   'search.isShowHotSearch': false,
   'search.isShowHistorySearch': false,
@@ -72,10 +80,12 @@ const defaultSetting: LX.AppSetting = {
 
   'sync.enable': false,
 
-  // 'theme.id': 'blue_plus',
-  'theme.id': 'green',
-  'theme.lightId': 'green',
-  'theme.darkId': 'black',
+  // [BYD] 车机 fork 默认主题改为夜曲/白昼（car 组件按设计稿配色渲染）
+  // 保留 isAutoTheme/langId/新年皮肤的上游原逻辑，手机竖屏行为不变
+  'theme.id': 'nocturne',
+  'theme.lightId': 'daylight',
+  'theme.darkId': 'nocturne',
+  // [/BYD]
   'theme.hideBgDark': false,
   'theme.dynamicBg': false,
   'theme.fontShadow': false,
