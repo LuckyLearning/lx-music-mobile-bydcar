@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.util.Log;
 import android.view.Gravity;
 import android.widget.TextView;
 
@@ -140,7 +139,6 @@ public class LyricTextView extends TextView {
   protected void onDraw(Canvas canvas) {
     float mSpeed = speed;
     if (text != null) {
-      Log.d("Lyric", "getHeight: " + getHeight() + " y: " + y);
       // [BYD] 先描边后填充；空心字模式下跳过填充层
       if (strokeWidth > 0f) {
         strokePaint.setTextSize(mPaint.getTextSize());

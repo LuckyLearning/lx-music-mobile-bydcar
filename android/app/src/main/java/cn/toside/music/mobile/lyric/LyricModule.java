@@ -229,10 +229,31 @@ public class LyricModule extends ReactContextBaseJavaModule {
     promise.resolve(null);
   }
 
-  // [BYD] 歌词样式：加粗 / 描边色 / 描边宽 / 空心字
+  // [BYD] 歌词样式：加粗 / 内置空心样式(0关/1细/2电影) / 空心大小
   @ReactMethod
-  public void setLyricStyle(boolean bold, String strokeColor, float strokeWidth, boolean hollow, Promise promise) {
-    if (lyric != null) lyric.setLyricStyle(bold, strokeColor, strokeWidth, hollow);
+  public void setLyricStyle(boolean bold, int hollowStyle, float hollowSize, Promise promise) {
+    if (lyric != null) lyric.setLyricStyle(bold, hollowStyle, hollowSize);
+    promise.resolve(null);
+  }
+
+  // [BYD] 其它行字号
+  @ReactMethod
+  public void setOtherTextSize(float size, Promise promise) {
+    if (lyric != null) lyric.setOtherTextSize(size);
+    promise.resolve(null);
+  }
+
+  // [BYD] 歌名/歌手
+  @ReactMethod
+  public void setMusicMeta(String name, String singer, Promise promise) {
+    if (lyric != null) lyric.setMusicMeta(name, singer);
+    promise.resolve(null);
+  }
+
+  // [BYD] 标题显示：模式 / 上下位置 / 对齐 / 颜色
+  @ReactMethod
+  public void setTitleOptions(String mode, String position, String align, String color, Promise promise) {
+    if (lyric != null) lyric.setTitleOptions(mode, position, align, color);
     promise.resolve(null);
   }
 

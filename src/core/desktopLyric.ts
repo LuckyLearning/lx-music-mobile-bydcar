@@ -12,6 +12,7 @@ import {
   setColor,
   setAlpha,
   setTextSize,
+  setOtherTextSize,
   setShowToggleAnima,
   setSingleLine,
   setPosition,
@@ -26,9 +27,10 @@ import {
   setLetterSpacing,
   setTargetDisplay,
   getDisplays,
-  // [BYD] 位置 / 高度 / 歌词样式
   setHeight,
   setLyricStyle,
+  setMusicMeta,
+  setTitleOptions,
 } from '@/utils/nativeModules/lyricDesktop'
 import settingState from '@/store/setting/state'
 import playerState from '@/store/player/state'
@@ -38,8 +40,17 @@ export {
   onLyricLinePlay,
 } from '@/utils/nativeModules/lyricDesktop'
 
+const readMusicMeta = () => {
+  const info = playerState.musicInfo
+  return {
+    musicName: info.name ?? '',
+    musicSinger: info.singer ?? '',
+  }
+}
+
 export const showDesktopLyric = async() => {
   const setting = settingState.setting
+  const meta = readMusicMeta()
   await showDesktopLyricView({
     isShowToggleAnima: setting['desktopLyric.showToggleAnima'],
     isSingleLine: setting['desktopLyric.isSingleLine'],
@@ -49,6 +60,7 @@ export const showDesktopLyric = async() => {
     shadowColor: setting['desktopLyric.style.lyricShadowColor'],
     opacity: setting['desktopLyric.style.opacity'],
     textSize: setting['desktopLyric.style.fontSize'],
+    otherTextSize: setting['desktopLyric.style.otherFontSize'],
     width: setting['desktopLyric.width'],
     maxLineNum: setting['desktopLyric.maxLineNum'],
     positionX: setting['desktopLyric.position.x'],
@@ -62,11 +74,16 @@ export const showDesktopLyric = async() => {
     borderWidth: setting['desktopLyric.style.borderWidth'],
     letterSpacing: setting['desktopLyric.style.letterSpacing'],
     bold: setting['desktopLyric.style.bold'],
-    strokeColor: setting['desktopLyric.style.strokeColor'],
-    strokeWidth: setting['desktopLyric.style.strokeWidth'],
-    hollow: setting['desktopLyric.style.hollow'],
+    hollowStyle: setting['desktopLyric.style.hollowStyle'],
+    hollowSize: setting['desktopLyric.style.hollowSize'],
     height: setting['desktopLyric.height'],
     displayId: setting['desktopLyric.displayId'],
+    musicName: meta.musicName,
+    musicSinger: meta.musicSinger,
+    titleMode: setting['desktopLyric.title.mode'],
+    titlePosition: setting['desktopLyric.title.position'],
+    titleAlign: setting['desktopLyric.title.align'],
+    titleColor: setting['desktopLyric.title.color'],
   })
   let lrc = playerState.musicInfo.lrc ?? ''
   let tlrc = playerState.musicInfo.tlrc ?? ''
@@ -102,6 +119,7 @@ export const setDesktopLyricColor = async(unplayColor: string | null, playedColo
 }
 export const setDesktopLyricAlpha = setAlpha
 export const setDesktopLyricTextSize = setTextSize
+export const setDesktopLyricOtherTextSize = setOtherTextSize
 export const setShowDesktopLyricToggleAnima = setShowToggleAnima
 export const setDesktopLyricSingleLine = setSingleLine
 export const setDesktopLyricPosition = setPosition
@@ -128,7 +146,7 @@ export const setDesktopLyricLetterSpacing = setLetterSpacing
 export const setDesktopLyricDisplay = setTargetDisplay
 export const getDesktopLyricDisplays = getDisplays
 
-// ===== [BYD] 位置 / 高度 / 歌词样式 =====
+// ===== [BYD] 位置 / 高度 / 歌词样式 / 标题 =====
 
 /** 窗口高度百分比（0 = 按行数自适应） */
 export const setDesktopLyricHeight = setHeight
@@ -136,14 +154,35 @@ export const setDesktopLyricHeight = setHeight
 /** 按屏幕百分比调整悬浮窗位置（0-100，左上角基准） */
 export const setDesktopLyricPositionPercent = setPosition
 
-/** 歌词样式：加粗 / 描边色 / 描边宽 / 空心字 */
-export const setDesktopLyricStyle = async(bold?: boolean, strokeColor?: string, strokeWidth?: number, hollow?: boolean) => {
+/** 歌词样式：加粗 / 内置空心样式 / 空心大小 */
+export const setDesktopLyricStyle = async(bold?: boolean, hollowStyle?: number, hollowSize?: number) => {
   const s = settingState.setting
   return setLyricStyle(
     bold ?? s['desktopLyric.style.bold'],
-    strokeColor ?? s['desktopLyric.style.strokeColor'],
-    strokeWidth ?? s['desktopLyric.style.strokeWidth'],
-    hollow ?? s['desktopLyric.style.hollow'],
+    hollowStyle ?? s['desktopLyric.style.hollowStyle'],
+    hollowSize ?? s['desktopLyric.style.hollowSize'],
+  )
+}
+
+/** 同步当前歌曲名/歌手到悬浮窗 */
+export const setDesktopLyricMusicMeta = async(name?: string, singer?: string) => {
+  const meta = readMusicMeta()
+  return setMusicMeta(name ?? meta.musicName, singer ?? meta.musicSinger)
+}
+
+/** 标题显示选项 */
+export const setDesktopLyricTitleOptions = async(
+  mode?: LX.AppSetting['desktopLyric.title.mode'],
+  position?: LX.AppSetting['desktopLyric.title.position'],
+  align?: LX.AppSetting['desktopLyric.title.align'],
+  color?: string,
+) => {
+  const s = settingState.setting
+  return setTitleOptions(
+    mode ?? s['desktopLyric.title.mode'],
+    position ?? s['desktopLyric.title.position'],
+    align ?? s['desktopLyric.title.align'],
+    color ?? s['desktopLyric.title.color'],
   )
 }
 

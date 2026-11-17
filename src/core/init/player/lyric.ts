@@ -1,7 +1,8 @@
 import { init as initLyricPlayer, toggleTranslation, toggleRoma, play, pause, stop, setLyric, setPlaybackRate } from '@/core/lyric'
 import { updateSetting } from '@/core/common'
-import { onDesktopLyricPositionChange, showDesktopLyric, onLyricLinePlay, showRemoteLyric } from '@/core/desktopLyric'
+import { onDesktopLyricPositionChange, showDesktopLyric, onLyricLinePlay, showRemoteLyric, setDesktopLyricMusicMeta } from '@/core/desktopLyric'
 import playerState from '@/store/player/state'
+import settingState from '@/store/setting/state'
 import { updateNowPlayingTitles } from '@/plugins/player/utils'
 import { setLastLyric } from '@/core/player/playInfo'
 
@@ -61,4 +62,9 @@ export default async(setting: LX.AppSetting) => {
   global.app_event.on('error', pause)
   global.app_event.on('musicToggled', stop)
   global.app_event.on('lyricUpdated', setLyric)
+  // [BYD] 切歌时同步悬浮窗歌名/歌手
+  global.state_event.on('playerMusicInfoChanged', () => {
+    if (!settingState.setting['desktopLyric.enable']) return
+    void setDesktopLyricMusicMeta()
+  })
 }

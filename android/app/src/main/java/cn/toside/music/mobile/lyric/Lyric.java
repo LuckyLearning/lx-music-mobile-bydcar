@@ -358,9 +358,27 @@ public class Lyric extends LyricPlayer {
     lyricView.setHeightPercent(height);
   }
 
-  // [BYD] 歌词样式：加粗 / 描边色 / 描边宽 / 空心字
-  public void setLyricStyle(boolean bold, String strokeColor, float strokeWidth, boolean hollow) {
+  // [BYD] 歌词样式：加粗 / 内置空心样式 / 空心大小
+  public void setLyricStyle(boolean bold, int hollowStyle, float hollowSize) {
     if (lyricView == null) return;
-    lyricView.setLyricStyle(bold, strokeColor, strokeWidth, hollow);
+    lyricView.setLyricStyle(bold, hollowStyle, hollowSize);
+  }
+
+  // [BYD] 其它行字号
+  public void setOtherTextSize(float size) {
+    if (lyricView == null) return;
+    lyricView.setOtherTextSize(size);
+  }
+
+  // [BYD] 歌名/歌手
+  public void setMusicMeta(String name, String singer) {
+    if (lyricView == null) return;
+    lyricView.setMusicMeta(name, singer);
+  }
+
+  // [BYD] 标题显示选项
+  public void setTitleOptions(String mode, String position, String align, String color) {
+    if (lyricView == null) return;
+    lyricView.setTitleOptions(mode, position, align, color);
   }
 }

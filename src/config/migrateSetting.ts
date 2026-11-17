@@ -48,5 +48,14 @@ export default (setting: any): Partial<LX.AppSetting> => {
     if (setting['player.isEnableAudioOffload']) setting['player.isEnableAudioOffload'] = false
   }
 
+  // [BYD] 旧版空心字布尔开关 → 内置样式 2（电影字幕）
+  if (setting['desktopLyric.style.hollow'] === true && setting['desktopLyric.style.hollowStyle'] == null) {
+    setting['desktopLyric.style.hollowStyle'] = 2
+    if (setting['desktopLyric.style.hollowSize'] == null) {
+      const w = setting['desktopLyric.style.strokeWidth']
+      setting['desktopLyric.style.hollowSize'] = typeof w == 'number' && w > 0 ? w : 4
+    }
+  }
+
   return setting
 }
