@@ -1005,7 +1005,10 @@ public class LyricView extends Activity implements View.OnTouchListener {
 
   public void setTargetDisplay(int displayId) {
     if (!onMainThread()) {
-      mainHandler.post(() -> setTargetDisplay(displayId));
+      // displayId is reassigned below, so the lambda must capture a final copy.
+      // Normalization still happens on the main thread, including for this posted call.
+      final int requestedDisplayId = displayId;
+      mainHandler.post(() -> setTargetDisplay(requestedDisplayId));
       return;
     }
     if (displayId < 0) displayId = Display.DEFAULT_DISPLAY;
