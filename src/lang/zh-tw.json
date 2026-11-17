@@ -364,6 +364,8 @@
   "setting_play_show_roma": "顯示歌詞羅馬音（如果可用）",
   "setting_play_show_translation": "顯示歌詞翻譯（如果可用）",
   "setting_player": "播放設定",
+  "setting_player_car_layout": "車機佈局",
+  "setting_player_car_layout_tip": "開啟後，橫屏播放頁改為左側歌詞（歌名與歌手固定在上方）、右側方形封面，底部為播放控制，並留出系統 Dock。豎屏仍使用原來的播放頁。關閉時橫屏也維持現有播放頁。",
   "setting_player_save_play_time": "記住播放進度",
   "setting_search": "搜尋設定",
   "setting_search_show_history_search": "顯示歷史搜尋記錄",

@@ -202,6 +202,11 @@ declare global {
       'player.isShowBluetoothFullLyric': boolean
 
       /**
+       * 横屏时使用车机播放页（左侧歌词、右侧方形封面、底部控制）。竖屏不生效。
+       */
+      'player.carLayout': boolean
+
+      /**
        * 播放详情页-是否缩放当前播放的歌词行
        */
       // 'playDetail.isZoomActiveLrc': boolean

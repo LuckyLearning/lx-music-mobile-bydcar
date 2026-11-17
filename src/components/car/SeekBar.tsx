@@ -17,6 +17,8 @@ export interface SeekBarProps {
   seekable?: boolean
   color?: ColorValue
   trackColor?: ColorValue
+  /** 按下、拖动、松手时通知，便于播放条重置自动隐藏 */
+  onInteraction?: () => void
 }
 
 const Bar = ({ width, color }: { width: `${number}%`, color?: ColorValue }) => (
@@ -27,12 +29,14 @@ const Bar = ({ width, color }: { width: `${number}%`, color?: ColorValue }) => (
  * 进度条：触控层与可见条同宽，onLayout 测的就是可见条宽度，
  * 加大触控区不影响点击位置换算
  */
-export default memo(({ progress, duration, buffered, barHeight = 3, touchHeight = 24, align = 'center', seekable = true, color, trackColor }: SeekBarProps) => {
+export default memo(({ progress, duration, buffered, barHeight = 3, touchHeight = 24, align = 'center', seekable = true, color, trackColor, onInteraction }: SeekBarProps) => {
   const theme = useTheme()
   const [dragging, setDragging] = useState(false)
   const [dragProgress, setDragProgress] = useState(0)
   const durationRef = useRef(duration)
   durationRef.current = duration
+  const onInteractionRef = useRef(onInteraction)
+  onInteractionRef.current = onInteraction
 
   const onSetProgress = useCallback((value: number) => {
     global.app_event.setProgress(value * durationRef.current)
@@ -44,12 +48,15 @@ export default memo(({ progress, duration, buffered, barHeight = 3, touchHeight 
       onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderGrant: (evt, gestureState) => {
+        onInteractionRef.current?.()
         onDragStart(gestureState.dx, evt.nativeEvent.locationX)
       },
       onPanResponderMove: (evt, gestureState) => {
+        onInteractionRef.current?.()
         onDrag(gestureState.dx)
       },
       onPanResponderRelease: () => {
+        onInteractionRef.current?.()
         onDragEnd()
       },
     }),
