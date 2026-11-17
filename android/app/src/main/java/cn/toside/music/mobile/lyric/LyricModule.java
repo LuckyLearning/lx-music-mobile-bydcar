@@ -215,6 +215,27 @@ public class LyricModule extends ReactContextBaseJavaModule {
     promise.resolve(null);
   }
 
+  // [BYD] 按屏幕百分比设置悬浮窗位置（0-100，左上角基准）
+  @ReactMethod
+  public void setPosition(float x, float y, Promise promise) {
+    if (lyric != null) lyric.setPosition(x, y);
+    promise.resolve(null);
+  }
+
+  // [BYD] 窗口高度百分比（0 = 按行数自适应）
+  @ReactMethod
+  public void setHeight(float height, Promise promise) {
+    if (lyric != null) lyric.setHeight(height);
+    promise.resolve(null);
+  }
+
+  // [BYD] 歌词样式：加粗 / 描边色 / 描边宽 / 空心字
+  @ReactMethod
+  public void setLyricStyle(boolean bold, String strokeColor, float strokeWidth, boolean hollow, Promise promise) {
+    if (lyric != null) lyric.setLyricStyle(bold, strokeColor, strokeWidth, hollow);
+    promise.resolve(null);
+  }
+
   @ReactMethod
   public void checkOverlayPermission(Promise promise) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(reactContext)) {

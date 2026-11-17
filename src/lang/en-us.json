@@ -576,11 +576,14 @@
   "setting_lyric_desktop_border_color": "Border color",
   "setting_lyric_desktop_display_default": "Main screen",
   "setting_lyric_desktop_display_presentation": "Secondary screen",
-  "setting_lyric_desktop_font": "Font",
-  "setting_lyric_desktop_font_default": "System default",
-  "setting_lyric_desktop_font_sans": "Sans",
-  "setting_lyric_desktop_font_serif": "Serif",
-  "setting_lyric_desktop_font_mono": "Monospace",
-  "setting_lyric_desktop_font_light": "Light",
-  "setting_lyric_desktop_font_condensed": "Condensed"
+  "setting_lyric_desktop_view_height": "Window height (%)",
+  "setting_lyric_desktop_view_height_auto": "Auto",
+  "setting_lyric_desktop_position_x": "Window position X (%)",
+  "setting_lyric_desktop_position_y": "Window position Y (%)",
+  "setting_lyric_desktop_text_bold": "Bold lyric",
+  "setting_lyric_desktop_stroke": "Lyric stroke",
+  "setting_lyric_desktop_stroke_color": "Stroke color",
+  "setting_lyric_desktop_stroke_width": "Stroke width",
+  "setting_lyric_desktop_hollow": "Hollow text (movie subtitle style)",
+  "setting_lyric_desktop_bg_opacity": "Background opacity"
 }

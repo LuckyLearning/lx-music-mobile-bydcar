@@ -17,7 +17,9 @@ import Theme from './Theme'
 import BgStyle from './BgStyle'
 import LetterSpacing from './LetterSpacing'
 import DisplaySelect from './DisplaySelect'
-import FontFamily from './FontFamily'
+import ViewHeight from './ViewHeight'
+import { PositionX, PositionY } from './Position'
+import LyricStyle from './LyricStyle'
 // import { useTranslation } from '@/plugins/i18n'
 
 export default memo(() => {
@@ -32,13 +34,16 @@ export default memo(() => {
       <Theme />
       <TextSize />
       <ViewWidth />
+      <ViewHeight />
       <MaxLineNum />
       <TextOpacity />
       <TextPositionX />
       <TextPositionY />
+      <PositionX />
+      <PositionY />
       <BgStyle />
       <LetterSpacing />
-      <FontFamily />
+      <LyricStyle />
       <DisplaySelect />
     </Section>
   )
