@@ -36,11 +36,16 @@ public class LyricLinesView extends FrameLayout {
   private float textSize = 18f;
   private float otherTextSize = 14f;
   private float letterSpacing = 0f;
+  private float otherLetterSpacing = 0f;
   private boolean bold = false;
+  private boolean otherBold = false;
   private int hollowStyle = 0;
+  private int otherHollowStyle = 0;
   private float hollowSize = 0f;
+  private float otherHollowSize = 0f;
   private float textAlpha = 1f;
   private int horizGravity = Gravity.START;
+  private int otherHorizGravity = Gravity.START;
   private int slotHeight = 0;
   private int gapPx;
 
@@ -66,11 +71,16 @@ public class LyricLinesView extends FrameLayout {
     if (!show) snapTo(lines, lineNum);
   }
 
+  void setGravities(int current, int other) {
+    horizGravity = current;
+    otherHorizGravity = other;
+    applyGravity(topIncoming, true);
+    applyGravity(bottomIncoming, false);
+    for (int i = 0; i < slots.size(); i++) applyGravity(slots.get(i), i == 0);
+  }
+
   void setGravity(int gravity) {
-    horizGravity = gravity;
-    applyGravity(topIncoming);
-    applyGravity(bottomIncoming);
-    for (StrokeTextView slot : slots) applyGravity(slot);
+    setGravities(gravity, gravity);
   }
 
   void setVisibleCount(int count) {
@@ -87,7 +97,7 @@ public class LyricLinesView extends FrameLayout {
       column.addView(slot);
     }
     column.addView(bottomIncoming);
-    applyStyles(playedColor, otherColor, shadowColor, textSize, otherTextSize, letterSpacing, bold, hollowStyle, hollowSize, textAlpha);
+    restyle();
     bind();
   }
 
@@ -98,9 +108,13 @@ public class LyricLinesView extends FrameLayout {
     float textSize,
     float otherTextSize,
     float letterSpacing,
+    float otherLetterSpacing,
     boolean bold,
+    boolean otherBold,
     int hollowStyle,
+    int otherHollowStyle,
     float hollowSize,
+    float otherHollowSize,
     float textAlpha
   ) {
     this.playedColor = playedColor;
@@ -109,14 +123,24 @@ public class LyricLinesView extends FrameLayout {
     this.textSize = textSize;
     this.otherTextSize = otherTextSize;
     this.letterSpacing = letterSpacing;
+    this.otherLetterSpacing = otherLetterSpacing;
     this.bold = bold;
+    this.otherBold = otherBold;
     this.hollowStyle = hollowStyle;
+    this.otherHollowStyle = otherHollowStyle;
     this.hollowSize = hollowSize;
+    this.otherHollowSize = otherHollowSize;
     this.textAlpha = textAlpha;
+    restyle();
+  }
 
-    topIncoming.setTypeface(bold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-    topIncoming.setTextSize(textSize);
-    slotHeight = Math.max(topIncoming.getLineHeight(), 1);
+  /** 行高取当前行和其它行里更高的那个，滚动距离保持固定，避免两套字号把联动动画拉开。 */
+  private void restyle() {
+    topIncoming.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+    bottomIncoming.setTextSize(TypedValue.COMPLEX_UNIT_SP, otherTextSize);
+    int currentH = Math.max(topIncoming.getLineHeight(), 1);
+    int otherH = Math.max(bottomIncoming.getLineHeight(), 1);
+    slotHeight = Math.max(currentH, otherH);
     styleLine(topIncoming, true);
     styleLine(bottomIncoming, false);
     for (int i = 0; i < slots.size(); i++) styleLine(slots.get(i), i == 0);
@@ -269,21 +293,28 @@ public class LyricLinesView extends FrameLayout {
       LinearLayout.LayoutParams.WRAP_CONTENT
     );
     view.setLayoutParams(lp);
-    applyGravity(view);
+    applyGravity(view, false);
     return view;
   }
 
-  private void applyGravity(StrokeTextView view) {
-    view.setGravity(horizGravity | Gravity.CENTER_VERTICAL);
+  private void applyGravity(StrokeTextView view, boolean current) {
+    int gravity = current ? horizGravity : otherHorizGravity;
+    view.setGravity(gravity | Gravity.CENTER_VERTICAL);
   }
 
   private void styleLine(StrokeTextView view, boolean current) {
     view.setTextSize(TypedValue.COMPLEX_UNIT_SP, current ? textSize : otherTextSize);
     view.setTextColor(current ? playedColor : otherColor);
-    view.setTypeface(bold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-    view.setLetterSpacing(letterSpacing);
+    view.setTypeface((current ? bold : otherBold) ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+    view.setLetterSpacing(current ? letterSpacing : otherLetterSpacing);
     view.setShadowLayer(current ? 1.6f : 1.2f, 1f, 1f, shadowColor);
-    LyricStroke.apply(view, hollowStyle, hollowSize, current, textAlpha);
+    LyricStroke.apply(
+      view,
+      current ? hollowStyle : otherHollowStyle,
+      current ? hollowSize : otherHollowSize,
+      textAlpha
+    );
+    applyGravity(view, current);
     LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) view.getLayoutParams();
     int height = slotHeight > 0 ? slotHeight : view.getLineHeight();
     if (lp.height != height || lp.bottomMargin != gapPx) {

@@ -3,7 +3,8 @@ import { NativeModules, NativeEventEmitter } from 'react-native'
 const { LyricModule } = NativeModules
 
 const getAlpha = (num: number) => num / 100
-const getTextSize = (num: number) => num / 10
+// 字号已经是磅，直接交给原生（setTextSize 用 sp，1 磅 = 旧滑块 10）。不要再除 10。
+const getTextSize = (num: number) => num
 
 /**
  * 发送歌词事件
@@ -39,6 +40,11 @@ export const showDesktopLyricView = async({
   bold,
   hollowStyle,
   hollowSize,
+  otherAlign,
+  otherLetterSpacing,
+  otherBold,
+  otherHollowStyle,
+  otherHollowSize,
   height,
   displayId,
   musicName,
@@ -47,6 +53,11 @@ export const showDesktopLyricView = async({
   titlePosition,
   titleAlign,
   titleColor,
+  titleTextSize,
+  titleLetterSpacing,
+  titleBold,
+  titleHollowStyle,
+  titleHollowSize,
 }: {
   isShowToggleAnima: boolean
   isSingleLine: boolean
@@ -71,6 +82,11 @@ export const showDesktopLyricView = async({
   bold: boolean
   hollowStyle: LX.AppSetting['desktopLyric.style.hollowStyle']
   hollowSize: number
+  otherAlign: LX.AppSetting['desktopLyric.style.otherAlign']
+  otherLetterSpacing: number
+  otherBold: boolean
+  otherHollowStyle: LX.AppSetting['desktopLyric.style.hollowStyle']
+  otherHollowSize: number
   height: number
   displayId: number
   musicName: string
@@ -79,6 +95,11 @@ export const showDesktopLyricView = async({
   titlePosition: LX.AppSetting['desktopLyric.title.position']
   titleAlign: LX.AppSetting['desktopLyric.title.align']
   titleColor: string
+  titleTextSize: number
+  titleLetterSpacing: number
+  titleBold: boolean
+  titleHollowStyle: LX.AppSetting['desktopLyric.style.hollowStyle']
+  titleHollowSize: number
 }): Promise<void> => {
   return LyricModule.showDesktopLyric({
     isSingleLine,
@@ -104,6 +125,11 @@ export const showDesktopLyricView = async({
     bold,
     hollowStyle,
     hollowSize,
+    otherAlign: otherAlign.toUpperCase(),
+    otherLetterSpacing,
+    otherBold,
+    otherHollowStyle,
+    otherHollowSize,
     height,
     displayId,
     musicName,
@@ -112,6 +138,11 @@ export const showDesktopLyricView = async({
     titlePosition,
     titleAlign,
     titleColor,
+    titleTextSize: getTextSize(titleTextSize),
+    titleLetterSpacing,
+    titleBold,
+    titleHollowStyle,
+    titleHollowSize,
   })
 }
 
@@ -284,6 +315,32 @@ export const setLyricStyle = async(bold: boolean, hollowStyle: number, hollowSiz
 /** [BYD] 歌名/歌手 */
 export const setMusicMeta = async(name: string, singer: string): Promise<void> => {
   return LyricModule.setMusicMeta(name, singer)
+}
+
+export interface LyricLineStylePayload {
+  textSize: number
+  textX: string
+  letterSpacing: number
+  bold: boolean
+  hollowStyle: number
+  hollowSize: number
+  otherTextSize: number
+  otherAlign: string
+  otherLetterSpacing: number
+  otherBold: boolean
+  otherHollowStyle: number
+  otherHollowSize: number
+  titleTextSize: number
+  titleAlign: string
+  titleLetterSpacing: number
+  titleBold: boolean
+  titleHollowStyle: number
+  titleHollowSize: number
+}
+
+/** [BYD] 当前行 / 其它行 / 标题行各自的文字样式。字号是磅，字距已经是 em。 */
+export const setLineStyles = async(styles: LyricLineStylePayload): Promise<void> => {
+  return LyricModule.setLineStyles(styles)
 }
 
 /** [BYD] 标题显示选项 */

@@ -411,4 +411,10 @@ public class Lyric extends LyricPlayer {
     if (lyricView == null) return;
     lyricView.setTitleOptions(mode, position, align, color);
   }
+
+  // [BYD] 当前行 / 其它行 / 标题行各自的文字样式
+  public void setLineStyles(Bundle styles) {
+    if (lyricView == null) return;
+    lyricView.setLineStyles(styles);
+  }
 }

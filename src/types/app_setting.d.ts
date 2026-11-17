@@ -282,9 +282,14 @@ declare global {
       'desktopLyric.textPosition.y': 'top' | 'center' | 'bottom'
 
       /**
-       * 桌面歌词字体大小
+       * 当前行字号，单位磅（1 磅 = 旧滑块数值 / 10 = 1sp）
        */
       'desktopLyric.style.fontSize': number
+
+      /**
+       * 字号已从旧滑块刻度迁移为磅。用来保证只除一次 10。
+       */
+      'desktopLyric.style.fontUnit': 'pt'
 
       /**
        * 桌面歌词字体透明度
@@ -347,9 +352,34 @@ declare global {
       'desktopLyric.style.hollowSize': number
 
       /**
-       * [BYD] 悬浮窗其它行（非当前行）字号
+       * [BYD] 悬浮窗其它行（非当前行）字号，单位磅
        */
       'desktopLyric.style.otherFontSize': number
+
+      /**
+       * [BYD] 其它行水平对齐（与当前行分开）
+       */
+      'desktopLyric.style.otherAlign': 'left' | 'center' | 'right'
+
+      /**
+       * [BYD] 其它行字距（滑块刻度，原生 em = 数值 / 100）
+       */
+      'desktopLyric.style.otherLetterSpacing': number
+
+      /**
+       * [BYD] 其它行加粗
+       */
+      'desktopLyric.style.otherBold': boolean
+
+      /**
+       * [BYD] 其它行空心字样式：0=关 / 1=细描边空心 / 2=电影字幕空心
+       */
+      'desktopLyric.style.otherHollowStyle': 0 | 1 | 2
+
+      /**
+       * [BYD] 其它行空心字大小（不再跟当前行按 0.75 捆绑）
+       */
+      'desktopLyric.style.otherHollowSize': number
 
       /**
        * [BYD] 悬浮窗标题显示：none / name / name_singer
@@ -370,6 +400,31 @@ declare global {
        * [BYD] 悬浮窗标题颜色
        */
       'desktopLyric.title.color': string
+
+      /**
+       * [BYD] 标题行字号，单位磅
+       */
+      'desktopLyric.title.fontSize': number
+
+      /**
+       * [BYD] 标题行字距（滑块刻度，原生 em = 数值 / 100）
+       */
+      'desktopLyric.title.letterSpacing': number
+
+      /**
+       * [BYD] 标题行加粗
+       */
+      'desktopLyric.title.bold': boolean
+
+      /**
+       * [BYD] 标题行空心字样式：0=关 / 1=细描边空心 / 2=电影字幕空心
+       */
+      'desktopLyric.title.hollowStyle': 0 | 1 | 2
+
+      /**
+       * [BYD] 标题行空心字大小
+       */
+      'desktopLyric.title.hollowSize': number
 
       /**
        * [BYD] 悬浮窗窗口高度占屏幕高度百分比（0 表示按行数自适应）
