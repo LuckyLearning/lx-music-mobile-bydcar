@@ -19,14 +19,15 @@ import { showPactModal } from '@/core/common'
 export default memo(() => {
   const theme = useTheme()
   const t = useI18n()
+  // [BYD] 本 fork 的开源地址 / 反馈入口 / 发布渠道（上游地址仅保留在许可协议处）
   const openHomePage = () => {
-    void openUrl('https://github.com/lyswhut/lx-music-mobile#readme')
+    void openUrl('https://github.com/LuckyLearning/lx-music-mobile-bydcar#readme')
   }
   const openIssuePage = () => {
-    void openUrl('https://github.com/lyswhut/lx-music-mobile/issues?q=is%3Aissue+')
+    void openUrl('https://github.com/LuckyLearning/lx-music-mobile-bydcar/issues?q=is%3Aissue+')
   }
   const openGHReleasePage = () => {
-    void openUrl('https://github.com/lyswhut/lx-music-mobile/releases')
+    void openUrl('https://github.com/LuckyLearning/Release/tree/main/LxMusic')
   }
   const openFAQPage = () => {
     void openUrl('https://lyswhut.github.io/lx-music-doc/mobile/faq')
@@ -65,7 +66,7 @@ export default memo(() => {
       <View style={styles.part}>
         <Text style={styles.text} >本软件完全免费，代码已开源。开源地址：</Text>
         <TouchableOpacity onPress={openHomePage}>
-          <Text style={textLinkStyle}>https://github.com/lyswhut/lx-music-mobile</Text>
+          <Text style={textLinkStyle}>https://github.com/LuckyLearning/lx-music-mobile-bydcar</Text>
         </TouchableOpacity>
       </View>
       <View style={styles.part}>
