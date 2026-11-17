@@ -332,9 +332,29 @@ declare global {
       'desktopLyric.style.letterSpacing': number
 
       /**
-       * [BYD] 悬浮窗字体（空字符串表示系统默认）
+       * [BYD] 悬浮窗歌词加粗
        */
-      'desktopLyric.style.fontFamily': string
+      'desktopLyric.style.bold': boolean
+
+      /**
+       * [BYD] 悬浮窗歌词描边颜色
+       */
+      'desktopLyric.style.strokeColor': string
+
+      /**
+       * [BYD] 悬浮窗歌词描边宽度
+       */
+      'desktopLyric.style.strokeWidth': number
+
+      /**
+       * [BYD] 悬浮窗空心字（电影字幕风格，只留描边轮廓）
+       */
+      'desktopLyric.style.hollow': boolean
+
+      /**
+       * [BYD] 悬浮窗窗口高度占屏幕高度百分比（0 表示按行数自适应）
+       */
+      'desktopLyric.height': number
 
       /**
        * [BYD] 悬浮窗投屏目标显示器 id（-1 表示主屏）

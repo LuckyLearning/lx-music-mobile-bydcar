@@ -46,8 +46,9 @@ public final class LyricSwitchView extends TextSwitcher {
 //      }
     } else {
       viewArray = new ArrayList<>(2);
-      textView = new TextView(context);
-      textView2 = new TextView(context);
+      // [BYD] 多行也用带描边能力的视图（加粗/描边/空心字在多行模式下同样生效）
+      textView = new StrokeTextView(context);
+      textView2 = new StrokeTextView(context);
       viewArray.add(textView);
       viewArray.add(textView2);
       for (TextView v : viewArray) {
@@ -178,8 +179,21 @@ public final class LyricSwitchView extends TextSwitcher {
     for (TextView v : viewArray) v.setHeight(i);
   }
 
-  public void setTypeface(Typeface typeface) {
+  // [BYD] 加粗：两种视图都走 TextView 的 typeface 通道
+  public void setBold(boolean bold) {
+    Typeface typeface = bold ? Typeface.create(Typeface.DEFAULT, Typeface.BOLD) : Typeface.DEFAULT;
     for (TextView v : viewArray) v.setTypeface(typeface);
+  }
+
+  // [BYD] 描边 / 空心字：单行（LyricTextView）用真 Stroke 画笔，多行（StrokeTextView）用偏移描边
+  public void setStrokeStyle(int color, float width, boolean hollow) {
+    for (TextView v : viewArray) {
+      if (v instanceof LyricTextView) {
+        ((LyricTextView) v).setStroke(color, width, hollow);
+      } else if (v instanceof StrokeTextView) {
+        ((StrokeTextView) v).setStrokeStyle(color, width, hollow);
+      }
+    }
   }
 
   public void setSingleLine(boolean bool) {

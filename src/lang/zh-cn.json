@@ -576,11 +576,14 @@
   "setting_lyric_desktop_border_color": "边框颜色",
   "setting_lyric_desktop_display_default": "主屏",
   "setting_lyric_desktop_display_presentation": "副屏",
-  "setting_lyric_desktop_font": "字体",
-  "setting_lyric_desktop_font_default": "系统默认",
-  "setting_lyric_desktop_font_sans": "黑体 Sans",
-  "setting_lyric_desktop_font_serif": "宋体 Serif",
-  "setting_lyric_desktop_font_mono": "等宽 Mono",
-  "setting_lyric_desktop_font_light": "细体 Light",
-  "setting_lyric_desktop_font_condensed": "窄体 Condensed"
+  "setting_lyric_desktop_view_height": "窗口百分比高度",
+  "setting_lyric_desktop_view_height_auto": "自适应",
+  "setting_lyric_desktop_position_x": "窗口水平位置 (%)",
+  "setting_lyric_desktop_position_y": "窗口垂直位置 (%)",
+  "setting_lyric_desktop_text_bold": "歌词加粗",
+  "setting_lyric_desktop_stroke": "歌词描边",
+  "setting_lyric_desktop_stroke_color": "描边颜色",
+  "setting_lyric_desktop_stroke_width": "描边宽度",
+  "setting_lyric_desktop_hollow": "空心字（电影字幕风格）",
+  "setting_lyric_desktop_bg_opacity": "背景透明度"
 }

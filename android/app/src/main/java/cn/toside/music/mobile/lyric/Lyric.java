@@ -128,9 +128,9 @@ public class Lyric extends LyricPlayer {
     this.pause();
   }
 
-  private void setCurrentLyric(String lyric, ArrayList<String> extendedLyrics) {
+  private void setCurrentLyric(String lyric, ArrayList<String> extendedLyrics, ArrayList<String> viewExtendedLyrics) {
     if (isShowLyricView && !isScreenOff && lyricView != null) {
-      lyricView.setLyric(lyric, extendedLyrics);
+      lyricView.setLyric(lyric, viewExtendedLyrics);
     }
     if (isSendLyricTextEvent) {
       WritableMap params = Arguments.createMap();
@@ -144,11 +144,28 @@ public class Lyric extends LyricPlayer {
     if (lineNum >= 0 && lineNum < lines.size()) {
       HashMap line = (HashMap) lines.get(lineNum);
       if (line != null) {
-        setCurrentLyric((String) line.get("text"), (ArrayList<String>) line.get("extendedLyrics"));
+        @SuppressWarnings("unchecked")
+        ArrayList<String> extended = (ArrayList<String>) line.get("extendedLyrics");
+        // [BYD] 无翻译/音译时用下一行歌词补位，让"最大行数"设置真正起效
+        // （此前行数>1 时若没有翻译，悬浮窗永远只显示一行）
+        ArrayList<String> viewExtended = extended;
+        if (extended == null || extended.isEmpty()) {
+          if (lineNum + 1 < lines.size()) {
+            HashMap next = (HashMap) lines.get(lineNum + 1);
+            if (next != null) {
+              String nextText = (String) next.get("text");
+              if (nextText != null && !nextText.isEmpty()) {
+                viewExtended = new ArrayList<>(1);
+                viewExtended.add(nextText);
+              }
+            }
+          }
+        }
+        setCurrentLyric((String) line.get("text"), extended, viewExtended);
         return;
       }
     }
-    setCurrentLyric("", new ArrayList<>(0));
+    setCurrentLyric("", new ArrayList<>(0), new ArrayList<>(0));
   }
 
   public void setSendLyricTextEvent(boolean isSend) {
@@ -327,5 +344,23 @@ public class Lyric extends LyricPlayer {
   public void setTargetDisplay(int displayId) {
     if (lyricView == null) return;
     lyricView.setTargetDisplay(displayId);
+  }
+
+  // [BYD] 按屏幕百分比设置悬浮窗位置（0-100）
+  public void setPosition(float x, float y) {
+    if (lyricView == null) return;
+    lyricView.setPositionPercent(x, y);
+  }
+
+  // [BYD] 窗口高度百分比（0 = 按行数自适应）
+  public void setHeight(float height) {
+    if (lyricView == null) return;
+    lyricView.setHeightPercent(height);
+  }
+
+  // [BYD] 歌词样式：加粗 / 描边色 / 描边宽 / 空心字
+  public void setLyricStyle(boolean bold, String strokeColor, float strokeWidth, boolean hollow) {
+    if (lyricView == null) return;
+    lyricView.setLyricStyle(bold, strokeColor, strokeWidth, hollow);
   }
 }

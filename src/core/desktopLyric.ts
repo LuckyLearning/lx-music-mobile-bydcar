@@ -26,6 +26,9 @@ import {
   setLetterSpacing,
   setTargetDisplay,
   getDisplays,
+  // [BYD] 位置 / 高度 / 歌词样式
+  setHeight,
+  setLyricStyle,
 } from '@/utils/nativeModules/lyricDesktop'
 import settingState from '@/store/setting/state'
 import playerState from '@/store/player/state'
@@ -58,7 +61,11 @@ export const showDesktopLyric = async() => {
     borderColor: setting['desktopLyric.style.borderColor'],
     borderWidth: setting['desktopLyric.style.borderWidth'],
     letterSpacing: setting['desktopLyric.style.letterSpacing'],
-    fontFamily: setting['desktopLyric.style.fontFamily'],
+    bold: setting['desktopLyric.style.bold'],
+    strokeColor: setting['desktopLyric.style.strokeColor'],
+    strokeWidth: setting['desktopLyric.style.strokeWidth'],
+    hollow: setting['desktopLyric.style.hollow'],
+    height: setting['desktopLyric.height'],
     displayId: setting['desktopLyric.displayId'],
   })
   let lrc = playerState.musicInfo.lrc ?? ''
@@ -120,6 +127,25 @@ export const setDesktopLyricBackground = async(bgColor?: string, bgRadius?: numb
 export const setDesktopLyricLetterSpacing = setLetterSpacing
 export const setDesktopLyricDisplay = setTargetDisplay
 export const getDesktopLyricDisplays = getDisplays
+
+// ===== [BYD] 位置 / 高度 / 歌词样式 =====
+
+/** 窗口高度百分比（0 = 按行数自适应） */
+export const setDesktopLyricHeight = setHeight
+
+/** 按屏幕百分比调整悬浮窗位置（0-100，左上角基准） */
+export const setDesktopLyricPositionPercent = setPosition
+
+/** 歌词样式：加粗 / 描边色 / 描边宽 / 空心字 */
+export const setDesktopLyricStyle = async(bold?: boolean, strokeColor?: string, strokeWidth?: number, hollow?: boolean) => {
+  const s = settingState.setting
+  return setLyricStyle(
+    bold ?? s['desktopLyric.style.bold'],
+    strokeColor ?? s['desktopLyric.style.strokeColor'],
+    strokeWidth ?? s['desktopLyric.style.strokeWidth'],
+    hollow ?? s['desktopLyric.style.hollow'],
+  )
+}
 
 
 export const showRemoteLyric = async(isSend: boolean) => {

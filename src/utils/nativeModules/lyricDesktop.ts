@@ -64,7 +64,11 @@ export const showDesktopLyricView = async({
   borderColor,
   borderWidth,
   letterSpacing,
-  fontFamily,
+  bold,
+  strokeColor,
+  strokeWidth,
+  hollow,
+  height,
   displayId,
 }: {
   isShowToggleAnima: boolean
@@ -86,7 +90,11 @@ export const showDesktopLyricView = async({
   borderColor: string
   borderWidth: number
   letterSpacing: number
-  fontFamily: string
+  bold: boolean
+  strokeColor: string
+  strokeWidth: number
+  hollow: boolean
+  height: number
   displayId: number
 }): Promise<void> => {
   return LyricModule.showDesktopLyric({
@@ -109,7 +117,11 @@ export const showDesktopLyricView = async({
     borderColor,
     borderWidth,
     letterSpacing,
-    fontFamily,
+    bold,
+    strokeColor,
+    strokeWidth,
+    hollow,
+    height,
     displayId,
   })
 }
@@ -268,6 +280,16 @@ export const setLetterSpacing = async(letterSpacing: number): Promise<void> => {
 /** 切换投屏目标显示器 */
 export const setTargetDisplay = async(displayId: number): Promise<void> => {
   return LyricModule.setTargetDisplay(displayId)
+}
+
+/** [BYD] 窗口高度百分比（0 = 按行数自适应） */
+export const setHeight = async(height: number): Promise<void> => {
+  return LyricModule.setHeight(height)
+}
+
+/** [BYD] 歌词样式：加粗 / 描边色 / 描边宽 / 空心字 */
+export const setLyricStyle = async(bold: boolean, strokeColor: string, strokeWidth: number, hollow: boolean): Promise<void> => {
+  return LyricModule.setLyricStyle(bold, strokeColor, strokeWidth, hollow)
 }
 
 export const onPositionChange = (handler: (position: { x: number, y: number }) => void): () => void => {

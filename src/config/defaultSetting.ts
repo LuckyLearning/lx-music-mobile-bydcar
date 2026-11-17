@@ -57,13 +57,18 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.style.lyricUnplayColor': 'rgba(255, 255, 255, 1)',
   'desktopLyric.style.lyricPlayedColor': 'rgba(7, 197, 86, 1)',
   'desktopLyric.style.lyricShadowColor': 'rgba(0, 0, 0, 0.6)',
-  // [BYD] 悬浮窗自定义样式（背景/边框/字距/字体/投屏屏）
+  // [BYD] 悬浮窗自定义样式（背景/边框/字距/描边/投屏屏）；字体族设置已移除
   'desktopLyric.style.bgColor': 'rgba(0, 0, 0, 0.35)',
   'desktopLyric.style.bgRadius': 12,
   'desktopLyric.style.borderColor': 'rgba(255, 255, 255, 0.2)',
   'desktopLyric.style.borderWidth': 0,
   'desktopLyric.style.letterSpacing': 0,
-  'desktopLyric.style.fontFamily': '',
+  'desktopLyric.style.bold': false,
+  'desktopLyric.style.strokeColor': 'rgba(0, 0, 0, 0.9)',
+  'desktopLyric.style.strokeWidth': 0,
+  'desktopLyric.style.hollow': false,
+  // [BYD] 窗口高度占屏幕高度百分比（0 = 按行数自适应）
+  'desktopLyric.height': 0,
   'desktopLyric.displayId': -1,
 
   'search.isShowHotSearch': false,

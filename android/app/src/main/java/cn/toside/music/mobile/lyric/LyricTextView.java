@@ -27,6 +27,8 @@ public class LyricTextView extends TextView {
   private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
   private int strokeColor = 0;
   private float strokeWidth = 0f;
+  // [BYD] 空心字模式：填充层不画，只留描边轮廓（电影字幕风格）
+  private boolean hollow = false;
   private final Runnable mStartScrollRunnable;
   private final Runnable invalidateRunnable;
   public static final int startScrollDelay = 1500;
@@ -77,9 +79,11 @@ public class LyricTextView extends TextView {
   // [BYD] 设置文字描边（outline）。先画描边再填字，浅色歌词压浅底也可读。
   // 关键：描边色 alpha 需钳到 254，否则 Paint 会把 alpha=255 的描边与文字透明度绑定，
   // 导致文字半透明时描边一起淡掉（WindTone 同款处理）。
-  public void setStroke(int color, float width) {
+  // isHollow = 空心字：跳过填充层，只画描边轮廓。
+  public void setStroke(int color, float width, boolean isHollow) {
     this.strokeColor = (color >>> 24) == 0xFF ? (color & 0xFEFFFFFF) : color;
     this.strokeWidth = width;
+    this.hollow = isHollow;
     strokePaint.setStyle(Paint.Style.STROKE);
     strokePaint.setStrokeJoin(Paint.Join.ROUND);
     strokePaint.setStrokeWidth(width);
@@ -137,13 +141,15 @@ public class LyricTextView extends TextView {
     float mSpeed = speed;
     if (text != null) {
       Log.d("Lyric", "getHeight: " + getHeight() + " y: " + y);
-      // [BYD] 先描边后填充，提升可读性
+      // [BYD] 先描边后填充；空心字模式下跳过填充层
       if (strokeWidth > 0f) {
         strokePaint.setTextSize(mPaint.getTextSize());
         strokePaint.setTypeface(mPaint.getTypeface());
         canvas.drawText(text, getDrawX(), y, strokePaint);
       }
-      canvas.drawText(text, getDrawX(), y, mPaint);
+      if (!hollow || strokeWidth <= 0f) {
+        canvas.drawText(text, getDrawX(), y, mPaint);
+      }
       if (getText().length() >= 20) {
         mSpeed += mSpeed;
       }

@@ -62,7 +62,13 @@ public class LyricView extends Activity implements View.OnTouchListener {
   private String borderColor = "rgba(255, 255, 255, 0.2)";
   private float borderWidth = 0f;
   private float letterSpacing = 0f;
-  private String fontFamily = "";
+  // [BYD] 歌词样式：加粗 / 描边 / 空心字（电影字幕风格）；字体族设置已按需求移除
+  private boolean bold = false;
+  private String strokeColor = "rgba(0, 0, 0, 0.9)";
+  private float strokeWidth = 0f;
+  private boolean hollow = false;
+  // [BYD] 窗口高度占屏幕高度百分比（0 = 按行数自适应）
+  private float heightPercentage = 0f;
   // [BYD] 投屏目标显示器 id（默认主屏）
   private int targetDisplayId = android.view.Display.DEFAULT_DISPLAY;
   // private String lastText = "LX Music ^-^";
@@ -171,7 +177,10 @@ public class LyricView extends Activity implements View.OnTouchListener {
 
   private void setLayoutParamsHeight() {
     if (textView == null) return;
-    int height = textView.getPaint().getFontMetricsInt(null) * maxLineNum;
+    // [BYD] heightPercentage > 0 时窗口高度按屏幕高度百分比取值，否则按行数自适应
+    int height = heightPercentage > 0f
+      ? (int) (maxHeight * heightPercentage)
+      : textView.getPaint().getFontMetricsInt(null) * maxLineNum;
     if (height > maxHeight - 100) height = maxHeight - 100;
     layoutParams.height = height;
     textView.setHeight(height);
@@ -258,7 +267,11 @@ public class LyricView extends Activity implements View.OnTouchListener {
     borderColor = options.getString("borderColor", borderColor);
     borderWidth = (float) options.getDouble("borderWidth", borderWidth);
     letterSpacing = (float) options.getDouble("letterSpacing", letterSpacing);
-    fontFamily = options.getString("fontFamily", fontFamily);
+    bold = options.getBoolean("bold", bold);
+    strokeColor = options.getString("strokeColor", strokeColor);
+    strokeWidth = (float) options.getDouble("strokeWidth", strokeWidth);
+    hollow = options.getBoolean("hollow", hollow);
+    heightPercentage = (float) options.getDouble("height", 0) / 100f;
     targetDisplayId = options.getInt("displayId", targetDisplayId);
     handleShowLyric();
     listenOrientationEvent();
@@ -296,13 +309,11 @@ public class LyricView extends Activity implements View.OnTouchListener {
     textView.setShadowColor(parseColor(shadowColor));
     textView.setAlpha(alpha);
     textView.setTextSize(textSize);
-    // [BYD] 应用字距与自定义字体
+    // [BYD] 应用字距
     textView.setLetterSpacings(letterSpacing);
-    if (!fontFamily.isEmpty()) {
-      try {
-        textView.setTypeface(android.graphics.Typeface.create(fontFamily, android.graphics.Typeface.NORMAL));
-      } catch (Exception ignored) { /* 字体不可用时回退系统字体 */ }
-    }
+    // [BYD] 应用加粗与描边/空心字样式
+    textView.setBold(bold);
+    textView.setStrokeStyle(parseColor(strokeColor), strokeWidth, hollow);
     // Log.d("Lyric", "alpha: " + alpha + " text size: " + textSize);
 
     //监听 OnTouch 事件 为了实现"移动歌词"功能
@@ -660,6 +671,39 @@ public class LyricView extends Activity implements View.OnTouchListener {
     this.letterSpacing = letterSpacing;
     if (textView == null) return;
     textView.setLetterSpacings(letterSpacing);
+  }
+
+  // [BYD] 按屏幕百分比设置悬浮窗位置（0-100，窗口左上角基准），与拖拽保存的坐标系一致
+  public void setPositionPercent(float x, float y) {
+    prevViewPercentageX = x / 100f;
+    prevViewPercentageY = y / 100f;
+    if (windowManager == null || textView == null || layoutParams == null) return;
+    fixViewPosition();
+    windowManager.updateViewLayout(textView, layoutParams);
+  }
+
+  // [BYD] 按屏幕高度百分比设置窗口高度（0 = 按行数自适应）
+  public void setHeightPercent(float height) {
+    heightPercentage = height / 100f;
+    if (windowManager == null || textView == null || layoutParams == null) return;
+    setLayoutParamsHeight();
+    fixViewPosition();
+    windowManager.updateViewLayout(textView, layoutParams);
+  }
+
+  // [BYD] 歌词样式：加粗 / 描边色 / 描边宽 / 空心字；加粗会改变行高，自适应高度需重算
+  public void setLyricStyle(boolean isBold, String newStrokeColor, float newStrokeWidth, boolean isHollow) {
+    this.bold = isBold;
+    this.strokeColor = newStrokeColor;
+    this.strokeWidth = newStrokeWidth;
+    this.hollow = isHollow;
+    if (textView == null) return;
+    textView.setBold(isBold);
+    textView.setStrokeStyle(parseColor(newStrokeColor), newStrokeWidth, isHollow);
+    if (windowManager != null && layoutParams != null && heightPercentage <= 0f) {
+      setLayoutParamsHeight();
+      windowManager.updateViewLayout(textView, layoutParams);
+    }
   }
 
   // [BYD] 切换投屏目标屏：销毁旧窗、换 WindowManager、在原位置重建
