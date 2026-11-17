@@ -2,40 +2,11 @@ import { NativeModules, NativeEventEmitter } from 'react-native'
 
 const { LyricModule } = NativeModules
 
-// export const themes = [
-//   { id: 'green', value: '#07c556' },
-//   { id: 'yellow', value: '#fffa12' },
-//   { id: 'blue', value: '#19b5fe' },
-//   { id: 'red', value: '#ff1222' },
-//   { id: 'pink', value: '#f1828d' },
-//   { id: 'purple', value: '#c851d4' },
-//   { id: 'orange', value: '#ffad12' },
-//   { id: 'grey', value: '#bdc3c7' },
-//   { id: 'black', value: '#333333' },
-//   { id: 'white', value: '#ffffff' },
-// ]
-
-// export const textPositionX = [
-//   { id: 'left', value: 'LEFT' },
-//   { id: 'center', value: 'CENTER' },
-//   { id: 'right', value: 'RIGHT' },
-// ]
-// export const textPositionY = [
-//   { id: 'top', value: 'TOP' },
-//   { id: 'center', value: 'CENTER' },
-//   { id: 'bottom', value: 'BOTTOM' },
-// ]
-
-// const getThemeColor = themeId => (themes.find(t => t.id == themeId) || themes[0]).value
-// const getTextPositionX = x => (textPositionX.find(t => t.id == x) || textPositionX[0]).value
-// const getTextPositionY = y => (textPositionY.find(t => t.id == y) || textPositionY[0]).value
 const getAlpha = (num: number) => num / 100
 const getTextSize = (num: number) => num / 10
 
 /**
  * 发送歌词事件
- * @param isShow
- * @returns
  */
 export const setSendLyricTextEvent = async(isSend: boolean) => {
   return LyricModule.setSendLyricTextEvent(isSend)
@@ -55,6 +26,7 @@ export const showDesktopLyricView = async({
   shadowColor,
   opacity,
   textSize,
+  otherTextSize,
   positionX,
   positionY,
   textPositionX,
@@ -65,11 +37,16 @@ export const showDesktopLyricView = async({
   borderWidth,
   letterSpacing,
   bold,
-  strokeColor,
-  strokeWidth,
-  hollow,
+  hollowStyle,
+  hollowSize,
   height,
   displayId,
+  musicName,
+  musicSinger,
+  titleMode,
+  titlePosition,
+  titleAlign,
+  titleColor,
 }: {
   isShowToggleAnima: boolean
   isSingleLine: boolean
@@ -81,6 +58,7 @@ export const showDesktopLyricView = async({
   shadowColor: string
   opacity: number
   textSize: number
+  otherTextSize: number
   positionX: number
   positionY: number
   textPositionX: LX.AppSetting['desktopLyric.textPosition.x']
@@ -91,11 +69,16 @@ export const showDesktopLyricView = async({
   borderWidth: number
   letterSpacing: number
   bold: boolean
-  strokeColor: string
-  strokeWidth: number
-  hollow: boolean
+  hollowStyle: LX.AppSetting['desktopLyric.style.hollowStyle']
+  hollowSize: number
   height: number
   displayId: number
+  musicName: string
+  musicSinger: string
+  titleMode: LX.AppSetting['desktopLyric.title.mode']
+  titlePosition: LX.AppSetting['desktopLyric.title.position']
+  titleAlign: LX.AppSetting['desktopLyric.title.align']
+  titleColor: string
 }): Promise<void> => {
   return LyricModule.showDesktopLyric({
     isSingleLine,
@@ -106,6 +89,7 @@ export const showDesktopLyricView = async({
     shadowColor,
     alpha: getAlpha(opacity),
     textSize: getTextSize(textSize),
+    otherTextSize: getTextSize(otherTextSize),
     lyricViewX: positionX,
     lyricViewY: positionY,
     textX: textPositionX.toUpperCase(),
@@ -118,11 +102,16 @@ export const showDesktopLyricView = async({
     borderWidth,
     letterSpacing,
     bold,
-    strokeColor,
-    strokeWidth,
-    hollow,
+    hollowStyle,
+    hollowSize,
     height,
     displayId,
+    musicName,
+    musicSinger,
+    titleMode,
+    titlePosition,
+    titleAlign,
+    titleColor,
   })
 }
 
@@ -214,6 +203,10 @@ export const setTextSize = async(size: number): Promise<void> => {
   return LyricModule.setTextSize(getTextSize(size))
 }
 
+export const setOtherTextSize = async(size: number): Promise<void> => {
+  return LyricModule.setOtherTextSize(getTextSize(size))
+}
+
 export const setShowToggleAnima = async(isShowToggleAnima: boolean): Promise<void> => {
   return LyricModule.setShowToggleAnima(isShowToggleAnima)
 }
@@ -233,10 +226,6 @@ export const setMaxLineNum = async(maxLineNum: number): Promise<void> => {
 export const setWidth = async(width: number): Promise<void> => {
   return LyricModule.setWidth(width)
 }
-
-// export const fixViewPosition = async(): Promise<void> => {
-//   return LyricModule.fixViewPosition()
-// }
 
 export const setLyricTextPosition = async(textX: LX.AppSetting['desktopLyric.textPosition.x'], textY: LX.AppSetting['desktopLyric.textPosition.y']): Promise<void> => {
   return LyricModule.setLyricTextPosition(textX.toUpperCase(), textY.toUpperCase())
@@ -287,9 +276,24 @@ export const setHeight = async(height: number): Promise<void> => {
   return LyricModule.setHeight(height)
 }
 
-/** [BYD] 歌词样式：加粗 / 描边色 / 描边宽 / 空心字 */
-export const setLyricStyle = async(bold: boolean, strokeColor: string, strokeWidth: number, hollow: boolean): Promise<void> => {
-  return LyricModule.setLyricStyle(bold, strokeColor, strokeWidth, hollow)
+/** [BYD] 歌词样式：加粗 / 内置空心样式 / 空心大小 */
+export const setLyricStyle = async(bold: boolean, hollowStyle: number, hollowSize: number): Promise<void> => {
+  return LyricModule.setLyricStyle(bold, hollowStyle, hollowSize)
+}
+
+/** [BYD] 歌名/歌手 */
+export const setMusicMeta = async(name: string, singer: string): Promise<void> => {
+  return LyricModule.setMusicMeta(name, singer)
+}
+
+/** [BYD] 标题显示选项 */
+export const setTitleOptions = async(
+  mode: LX.AppSetting['desktopLyric.title.mode'],
+  position: LX.AppSetting['desktopLyric.title.position'],
+  align: LX.AppSetting['desktopLyric.title.align'],
+  color: string,
+): Promise<void> => {
+  return LyricModule.setTitleOptions(mode, position, align, color)
 }
 
 export const onPositionChange = (handler: (position: { x: number, y: number }) => void): () => void => {
@@ -315,4 +319,3 @@ export const onLyricLinePlay = (handler: (lineInfo: { text: string, extendedLyri
     eventListener.remove()
   }
 }
-

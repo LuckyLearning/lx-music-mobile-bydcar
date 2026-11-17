@@ -337,19 +337,39 @@ declare global {
       'desktopLyric.style.bold': boolean
 
       /**
-       * [BYD] 悬浮窗歌词描边颜色
+       * [BYD] 悬浮窗空心字样式：0=关 / 1=细描边空心 / 2=电影字幕空心
        */
-      'desktopLyric.style.strokeColor': string
+      'desktopLyric.style.hollowStyle': 0 | 1 | 2
 
       /**
-       * [BYD] 悬浮窗歌词描边宽度
+       * [BYD] 悬浮窗空心字大小（描边强度，当前行与其它行按比例区分）
        */
-      'desktopLyric.style.strokeWidth': number
+      'desktopLyric.style.hollowSize': number
 
       /**
-       * [BYD] 悬浮窗空心字（电影字幕风格，只留描边轮廓）
+       * [BYD] 悬浮窗其它行（非当前行）字号
        */
-      'desktopLyric.style.hollow': boolean
+      'desktopLyric.style.otherFontSize': number
+
+      /**
+       * [BYD] 悬浮窗标题显示：none / name / name_singer
+       */
+      'desktopLyric.title.mode': 'none' | 'name' | 'name_singer'
+
+      /**
+       * [BYD] 悬浮窗标题相对歌词位置
+       */
+      'desktopLyric.title.position': 'above' | 'below'
+
+      /**
+       * [BYD] 悬浮窗标题水平对齐
+       */
+      'desktopLyric.title.align': 'left' | 'center' | 'right'
+
+      /**
+       * [BYD] 悬浮窗标题颜色
+       */
+      'desktopLyric.title.color': string
 
       /**
        * [BYD] 悬浮窗窗口高度占屏幕高度百分比（0 表示按行数自适应）
