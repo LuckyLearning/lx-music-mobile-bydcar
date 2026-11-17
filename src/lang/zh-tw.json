@@ -588,6 +588,7 @@
   "setting_lyric_desktop_font_inc": "增大字號",
   "setting_lyric_desktop_align": "水平對齊",
   "setting_lyric_desktop_color": "顏色",
+  "setting_lyric_desktop_color_pick": "點色塊打開取色盤",
   "setting_lyric_desktop_color_invalid": "顏色格式無效，仍使用上一次有效顏色",
   "setting_lyric_desktop_shadow_color": "陰影顏色",
   "setting_lyric_desktop_stroke": "歌詞描邊",

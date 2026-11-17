@@ -1,4 +1,4 @@
-// [BYD] 悬浮窗背景与边框：颜色用手填色值，透明度 / 圆角 / 边框宽度仍用滑块。
+// [BYD] 悬浮窗背景与边框：颜色用取色盘，透明度 / 圆角 / 边框宽度仍用滑块。
 import { memo, useCallback, useState } from 'react'
 import { View, StyleSheet } from 'react-native'
 
@@ -65,7 +65,7 @@ export default memo(() => {
   return (
     <>
       <SubTitle title={t('setting_lyric_desktop_bg_color')}>
-        <ColorValueField value={bgColor} onChange={c => { apply({ bgColor: c }) }} />
+        <ColorValueField title={t('setting_lyric_desktop_bg_color')} value={bgColor} onChange={c => { apply({ bgColor: c }) }} />
       </SubTitle>
       <SubTitle title={t('setting_lyric_desktop_bg_opacity')}>
         <View style={styles.sliderRow}>
@@ -96,7 +96,7 @@ export default memo(() => {
         </View>
       </SubTitle>
       <SubTitle title={t('setting_lyric_desktop_border_color')}>
-        <ColorValueField value={borderColor} onChange={c => { apply({ borderColor: c }) }} />
+        <ColorValueField title={t('setting_lyric_desktop_border_color')} value={borderColor} onChange={c => { apply({ borderColor: c }) }} />
       </SubTitle>
       <SubTitle title={t('setting_lyric_desktop_border_width')}>
         <View style={styles.sliderRow}>
