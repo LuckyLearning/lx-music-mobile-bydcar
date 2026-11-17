@@ -192,3 +192,23 @@ jobs:
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
+
+      # ------------------------------------------------------------ 公共分发仓
+      # 应用内更新必须能匿名读，所以每个版本再往公共仓 LuckyLearning/Release 发一份
+      # （LxMusic/latest.json + LxMusic/v<版本>/），应用内「检查更新」读的就是那里的 latest.json。
+      - name: 发布到公共分发仓（应用内更新源）
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_REPO_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.name }}
+          CODE: ${{ steps.ver.outputs.code }}
+          NOTES_PATH: dist/RELEASE-NOTES.md
+          DIST_DIR: dist
+          APP_DIR: LxMusic
+          MIN_SDK: '21'
+        run: |
+          if [ -z "$RELEASE_REPO_TOKEN" ]; then
+            echo "::error::未配置 secret RELEASE_REPO_TOKEN —— 公共仓库没有本次版本，应用内更新会停在旧版本"
+            exit 1
+          fi
+          bash scripts/publish-release-repo.sh

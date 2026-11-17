@@ -9,6 +9,9 @@
 | 文件 | 说明 |
 | --- | --- |
 | `.github/workflows/byd-release.yml` | BYD 独立出包工作流（tag 触发 / 手动触发，WindTone 同款签名） |
+| `scripts/publish-release-repo.sh` | 发布到公共分发仓 `LuckyLearning/Release`（与 WindTone 同一套目录约定，孤立提交 + force push，保留最近 5 版） |
+| `scripts/gen-release-manifest.py` | 生成 `latest.json`（含纯文本 `desc`，供更新弹窗直接显示）并刷新公共仓 README |
+| `src/config/release.ts` | 公共分发仓常量与镜像线路（jsDelivr → gh-proxy → ghproxy.net → 官方 raw 兜底） |
 | `docs/BYD-上游同步指南.md` | 上游同步操作规范 |
 | `docs/BYD-修改清单.md` | 本文件 |
 | `android/keystore.properties` | 本地签名配置（已 gitignore，不入库，仅本地存在） |
@@ -21,6 +24,8 @@
 | --- | --- | --- | --- |
 | `android/app/src/main/AndroidManifest.xml` | 三七分屏：application/Activity 加 `resizeableActivity=true`、两条 meta-data（`BYD_SUPPORT_SPLIT_ACTIVITY` / `allow_multiple_resumed_activities`）、`configChanges` 补 `density` | XML 注释 `[BYD]` | 上游若改 Manifest，保留这 4 处；上游新增的权限/组件照单全收 |
 | `.github/workflows/release.yml` | 关闭上游自动出包：`on.push` 改为 `workflow_dispatch`，避免按 package.json 版本号抢先建同名 tag/Release 与 `byd-release.yml` 撞车 | YAML 注释 `[BYD]` | 冲突时保留 `workflow_dispatch` 触发方式 |
+| `src/utils/version.js` | 更新源整体改为公共分发仓 `LuckyLearning/Release` 的 `LxMusic/latest.json`（多镜像），下载按清单 `assets` 选 ABI | 文件头 `[BYD]` 块 | 上游对本文件的改动**不保留**，以本实现为准 |
+| `src/screens/Home/Views/Setting/settings/About.tsx` | 开源地址/反馈 Issue/最新版下载页指向本 fork 与公共分发仓（FAQ 与许可协议仍指上游） | `// [BYD]` 注释 | 保留四处链接改动 |
 | `package.json` | `version`=`0.0.1`、`versionCode`=`1`（车机适配线，与上游 `1.9.x` 解耦） | — | 上游升版本时**保留**本 fork 的 0.0.x，上游 `1.9.x` 只记入基线说明 |
 | `src/types/theme.d.ts` | `ActiveTheme` 交叉 `DesignTokens` 类型 | TS 注释 `[BYD]` | 保留 `& DesignTokens` |
 | `src/utils/pixelRatio.ts` | 追加 `px()`/`sp()`（车机 1920×1080 设计稿换算） | `// [BYD]` 块 | 追加块整体保留，上游函数不动 |
@@ -84,7 +89,8 @@
 | 当前版本 | `0.0.1`（`package.json` 的 `version` / `versionCode` = `1`） |
 | 上游基线 | LX Music `v1.9.2`（`0669d1b`） |
 | 出包方式 | 打 tag `v0.0.1` → `[BYD] Build & Release` 工作流 → GitHub Release 挂 5 个 APK |
-| 发布形态 | 与 WindTone 一致：GitHub Releases 页面挂产物，正文含大小与 SHA-256 |
+| 发布形态 | 与 WindTone 一致：源码仓 Release 挂产物；**公共分发仓** `LuckyLearning/Release/LxMusic/`（`latest.json` + 版本目录，保留最近 5 版）供应用内更新与直链下载 |
+| 更新检查 | 应用内读 `LxMusic/latest.json`（jsDelivr → gh-proxy → ghproxy.net → 官方 raw），下载按设备 ABI 选包 |
 | 签名兜底 | 未配置 `KEYSTORE_BASE64` 时降级用仓库内 `android/app/debug.keystore`（`androiddebugkey` / `android`） |
 
 版本号语义：`0.0.x` 为车机适配线，与上游 `1.9.x` 版本号解耦；后续合入上游更新时只更新基线说明，不动本版本号。
