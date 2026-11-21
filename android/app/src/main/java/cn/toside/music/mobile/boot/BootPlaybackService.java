@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -44,21 +45,36 @@ public class BootPlaybackService extends HeadlessJsTaskService {
   private static final int NOTIFICATION_ID = 20002;
 
   private static volatile BootPlaybackService instance;
+  private static final BootTaskState tasks = new BootTaskState();
+  private volatile int taskToken;
+
+  public static boolean isTaskCurrent(int token) {
+    return tasks.isCurrent(token);
+  }
+
+  public static void cancelPending() {
+    tasks.cancel();
+  }
   private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
   public static boolean isRunning() {
     return instance != null;
   }
 
-  public static void finishIfRunning() {
+  public static void finishIfRunning(int token) {
     BootPlaybackService service = instance;
-    if (service == null) return;
-    service.mainHandler.post(service::stopKeepingAlive);
+    if (service == null || service.taskToken != token) return;
+    // Never tear down a newer task in response to an old JS finally block.
+    service.mainHandler.post(() -> {
+      if (instance == service && service.taskToken == token) service.stopKeepingAlive();
+    });
   }
 
   @Override
   public void onCreate() {
     super.onCreate();
+    // RN 0.73 releases its static lock unconditionally in onDestroy, including rejected starts.
+    HeadlessJsTaskService.acquireWakeLockNow(this);
     instance = this;
   }
 
@@ -67,6 +83,18 @@ public class BootPlaybackService extends HeadlessJsTaskService {
     if (intent == null || !ACTION_AUTOPLAY.equals(intent.getAction())) {
       return START_NOT_STICKY;
     }
+    if (!BootPrefs.isEnabled(this)) {
+      if (taskToken == 0) stopSelf();
+      return START_NOT_STICKY;
+    }
+    // BOOT_COMPLETED + QUICKBOOT may arrive before JS is even loaded.
+    if (taskToken != 0) return START_NOT_STICKY;
+    taskToken = tasks.begin(SystemClock.elapsedRealtime());
+    if (taskToken == 0) {
+      stopSelf();
+      return START_NOT_STICKY;
+    }
+    BootStatus.markReceived(this, BootStatus.ACTION_AUTOPLAY, "");
     try {
       startForeground(NOTIFICATION_ID, buildNotification());
     } catch (RuntimeException error) {
@@ -78,7 +106,9 @@ public class BootPlaybackService extends HeadlessJsTaskService {
       return START_NOT_STICKY;
     }
     Log.i(TAG, "foreground, starting headless playback");
-    return super.onStartCommand(intent, flags, startId);
+    super.onStartCommand(intent, flags, startId);
+    // Do not redeliver boot playback after a process kill.
+    return START_NOT_STICKY;
   }
 
   @Nullable
@@ -89,6 +119,7 @@ public class BootPlaybackService extends HeadlessJsTaskService {
     WritableArray delays = Arguments.createArray();
     for (long delay : BootRetryPolicy.DELAYS_MS) delays.pushDouble(delay);
     data.putArray("delays", delays);
+    data.putInt("token", taskToken);
     data.putDouble("confirmMs", BootRetryPolicy.CONFIRM_MS);
     // 超时留足三次尝试加在线取地址。0 表示不限时，车机上挂住就收不回来。
     return new HeadlessJsTaskConfig(TASK_NAME, data, 90_000, true);
@@ -96,6 +127,7 @@ public class BootPlaybackService extends HeadlessJsTaskService {
 
   @Override
   public void onDestroy() {
+    tasks.finish(taskToken);
     if (instance == this) instance = null;
     stopKeepingAlive();
     super.onDestroy();

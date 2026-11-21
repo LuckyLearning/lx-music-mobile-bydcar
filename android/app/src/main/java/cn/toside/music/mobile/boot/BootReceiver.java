@@ -41,7 +41,6 @@ public class BootReceiver extends BroadcastReceiver {
     }
 
     BootWindow.disarm(app);
-    BootStatus.markReceived(app, BootStatus.ACTION_AUTOPLAY, "");
     BootLaunch.startInBackground(app);
   }
 }
