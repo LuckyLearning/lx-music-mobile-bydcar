@@ -81,6 +81,16 @@ export const onWindowSizeChange = (handler: (size: { width: number, height: numb
   }
 }
 
+/** 开机后台服务是否已在跑。用于在 bundle 刚加载、任务体还没执行时拦住主界面。 */
+export const isBootPlaybackRunning = (): boolean => {
+  if (Platform.OS !== 'android' || typeof UtilsModule?.isBootPlaybackRunning !== 'function') return false
+  try {
+    return UtilsModule.isBootPlaybackRunning() === true
+  } catch {
+    return false
+  }
+}
+
 /** 把「开机自启」写进原生偏好。开机广播到达时 JS 还没起来，接收器只读这份值。iOS 无此能力。 */
 export const setBootAutostart = (enabled: boolean) => {
   if (Platform.OS !== 'android' || typeof UtilsModule?.setBootAutostart !== 'function') return
@@ -95,7 +105,7 @@ export interface BootStatusSnapshot {
   reason: string
 }
 
-/** 开机后台起播的结论。服务据此撤掉「正在恢复」通知。 */
+/** 开机后台启动的结论。服务据此撤掉启动通知。 */
 export const finishBootAutostart = (ok: boolean, reason: string) => {
   if (Platform.OS !== 'android' || typeof UtilsModule?.finishBootAutostart !== 'function') return
   try {
