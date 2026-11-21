@@ -2,22 +2,20 @@ import BackgroundTimer from 'react-native-background-timer'
 import TrackPlayer, { State } from 'react-native-track-player'
 
 import { setBootBackground } from '@/core/boot/mode'
+import { planBootPlayback } from '@/core/boot/plan'
 import init from '@/core/init'
 import { getListMusics } from '@/core/list'
 import { play, playList } from '@/core/player/player'
 import playerState from '@/store/player/state'
+import settingState from '@/store/setting/state'
 import { getPlayInfo } from '@/utils/data'
 import { finishBootAutostart } from '@/utils/nativeModules/utils'
 
 /**
- * 开机后台起播。对应听风的 {@code startPlaybackInBackground}：
- * 不打开主界面，恢复上次那一首并直接出声。
+ * 开机后台启动。听风那条路是 startService 拉播放服务、不打开主界面。
  *
- * 不看「启动后自动播放」。那个开关的语义是「用户点开应用时」，
- * 听风同样把开机起播和「打开应用继续播放」拆开。
- *
- * 没有播放记录时不挑一首在线歌。听风可以退到曲库第一首，因为它播的是本机文件；
- * 这里的曲库在网上，随便播一首会在用户没选的情况下去拉流。
+ * 出不出声看「启动后自动播放」：打开才恢复上次那一首并出声；关掉则只把播放器在后台就绪，不强制起播。
+ * 没有播放记录时不挑一首在线歌。
  *
  * 重试节奏由原生 {@code BootRetryPolicy} 传进来，缺省值与那边相同。
  */
@@ -42,7 +40,7 @@ const sleep = (ms: number) => new Promise<void>(resolve => {
   BackgroundTimer.setTimeout(() => resolve(), ms)
 })
 
-const text = (key: 'boot_autostart_no_history' | 'boot_autostart_missing_track' | 'boot_autostart_not_ready') => {
+const text = (key: 'boot_autostart_no_history' | 'boot_autostart_missing_track' | 'boot_autostart_not_ready' | 'boot_autostart_prepared') => {
   return global.i18n?.t(key) ?? key
 }
 
@@ -94,6 +92,13 @@ export async function runBackgroundAutostart(data?: BootTaskData) {
   try {
     console.log('LXBoot background autostart')
     await init()
+    if (planBootPlayback(!!settingState.setting['player.startupAutoPlay']) === 'prepare') {
+      // init 里已经按记录恢复了列表，这里不再调用 play()。
+      ok = true
+      reason = text('boot_autostart_prepared')
+      console.log('LXBoot prepared without autoplay')
+      return
+    }
     const delays = normalizeDelays(data?.delays)
     const confirmMs = typeof data?.confirmMs === 'number' && data.confirmMs > 0
       ? data.confirmMs
