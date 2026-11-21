@@ -17,6 +17,8 @@ const defaultSetting: LX.AppSetting = {
 
   'player.startupAutoPlay': false,
   'player.startupPushPlayDetailScreen': false,
+  // [BYD] 开机自启。默认关闭，与 AnyLyric 的 bootAutostart 一致。
+  'player.bootAutostart': false,
   'player.togglePlayMethod': 'listLoop',
   'player.playQuality': '128k',
   'player.isSavePlayTime': false,

@@ -32,6 +32,9 @@ import java.io.File;
 import java.util.Locale;
 import java.util.Objects;
 
+import cn.toside.music.mobile.boot.BootPrefs;
+import cn.toside.music.mobile.boot.BootWindow;
+
 public class UtilsModule extends ReactContextBaseJavaModule {
   private final ReactApplicationContext reactContext;
 
@@ -365,6 +368,12 @@ public class UtilsModule extends ReactContextBaseJavaModule {
       );
       promise.resolve(result);
     }).start();
+  }
+
+  @ReactMethod
+  public void setBootAutostart(boolean enabled) {
+    BootPrefs.setEnabled(reactContext, enabled);
+    if (!enabled) BootWindow.disarm(reactContext);
   }
 
   @ReactMethod

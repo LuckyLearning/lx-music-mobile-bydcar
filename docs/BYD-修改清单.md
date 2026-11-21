@@ -48,6 +48,16 @@
 | `android/.../lyric/Lyric.java` | 启停前台保活服务；透传背景/字距/投屏屏设置 | `// [BYD]` | 保留 service 启停两处 |
 | `android/.../lyric/LyricModule.java` | 新增桥接方法 `getDisplays`/`setBackgroundStyle`/`setLetterSpacing`/`setTargetDisplay` | `// [BYD]` | 保留 4 个 `@ReactMethod` |
 | `android/app/src/main/AndroidManifest.xml` | 前台服务声明 + `FOREGROUND_SERVICE*` / `POST_NOTIFICATIONS` 权限 | `[BYD]` | 与分屏改动同文件，保留 |
+| `android/app/src/main/AndroidManifest.xml` | 开机自启：`RECEIVE_BOOT_COMPLETED`、`BootReceiver`（BOOT_COMPLETED / QUICKBOOT_POWERON）、默认关闭的 `UserPresentReceiver` | `[BYD]` | 保留这两枚接收器与权限；`exported` 必须为 true |
+| `android/.../MainActivity.java` | 到前台时记下开机补拉已成功，并关掉亮屏补拉 | `[BYD]` | 保留 `onResume` 里的两行 |
+| `android/.../utils/UtilsModule.java` | `setBootAutostart` 把开关写入原生偏好 | `[BYD]` | 保留该 `@ReactMethod` |
+| `src/config/defaultSetting.ts` | `player.bootAutostart` 默认 `false` | `[BYD]` | 保留；默认必须是关闭 |
+| `src/types/app_setting.d.ts` | `player.bootAutostart` | `[BYD]` | 保留 |
+| `src/core/common.ts` | 启动与改设置时把开关同步给原生 | `[BYD]` | 保留两处 `setBootAutostart` |
+| `src/utils/nativeModules/utils.ts` | `setBootAutostart`，把开关交给原生 | `[BYD]` | 保留 |
+| `src/screens/.../Basic/index.tsx` | 基本设置挂上「开机自启」 | `[BYD]` | 保留 |
+| `src/lang/{zh-cn,zh-tw,en-us}.json` | `setting_basic_boot_autostart` 与说明 | `[BYD]` | 保留 |
+| `package.json` | `version`=`0.0.9`、`versionCode`=`9` | — | 车机线版本，勿被上游 1.9.x 覆盖 |
 | `src/config/defaultSetting.ts` | 新增悬浮窗样式与投屏屏默认值（7 项） | `// [BYD]` | 保留新增 7 行 |
 | `src/types/app_setting.d.ts` | 对应 7 个类型声明 | `[BYD]` | 保留 |
 | `src/core/desktopLyric.ts` | 透传新样式参数 + 导出 `setDesktopLyricBackground`/`LetterSpacing`/`Display`/`getDisplays` | `// [BYD]` | 保留 |
@@ -60,6 +70,8 @@
 | --- | --- |
 | `android/.../lyric/LyricDisplays.java` | 多屏枚举辅助类 |
 | `android/.../lyric/LyricOverlayService.java` | 桌面歌词前台保活服务 |
+| `android/.../boot/`（BootPolicy、BootPrefs、BootLaunch、BootWindow、BootReceiver、UserPresentReceiver） | 开机自启。开关 `player.bootAutostart` 默认关闭 |
+| `src/screens/Home/Views/Setting/settings/Basic/IsBootAutostart.tsx` | 基本设置里的「开机自启」 |
 | `src/screens/Home/Views/Setting/settings/LyricDesktop/BgStyle.tsx` | 背景/边框样式（色块+圆角/边框宽滑块） |
 | `src/screens/Home/Views/Setting/settings/LyricDesktop/LetterSpacing.tsx` | 字距滑块 |
 | `src/screens/Home/Views/Setting/settings/LyricDesktop/FontFamily.tsx` | 字体选择 |
@@ -89,7 +101,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | `0.0.1`（`package.json` 的 `version` / `versionCode` = `1`） |
+| 当前版本 | `0.0.9`（`package.json` 的 `version` / `versionCode` = `9`） |
 | 上游基线 | LX Music `v1.9.2`（`0669d1b`） |
 | 出包方式 | 打 tag `v0.0.1` → `[BYD] Build & Release` 工作流 → GitHub Release 挂 5 个 APK |
 | 发布形态 | 与 WindTone 一致：源码仓 Release 挂产物；**公共分发仓** `LuckyLearning/Release/LxMusic/`（`latest.json` + 版本目录，保留最近 5 版）供应用内更新与直链下载 |

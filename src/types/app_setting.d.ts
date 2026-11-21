@@ -117,6 +117,11 @@ declare global {
       'player.startupPushPlayDetailScreen': boolean
 
       /**
+       * 开机自启。默认关闭，仅 Android 生效。
+       */
+      'player.bootAutostart': boolean
+
+      /**
        * 切歌模式
        */
       'player.togglePlayMethod': 'listLoop' | 'random' | 'list' | 'singleLoop' | 'none'

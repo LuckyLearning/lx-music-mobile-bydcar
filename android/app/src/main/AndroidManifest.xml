@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- [BYD] 开机自启。只收开机广播；开关默认关闭，关着时接收器里直接返回。 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- [BYD] 桌面歌词前台服务保活所需权限 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
@@ -39,6 +41,28 @@
         android:name=".lyric.LyricOverlayService"
         android:exported="false"
         android:foregroundServiceType="mediaPlayback" />
+      <!--
+        [BYD] 开机自启。exported 必须为 true，否则系统发不出 BOOT_COMPLETED。
+        QUICKBOOT_POWERON 是部分车机的快速开机，语义与 BOOT_COMPLETED 相同。
+        亮屏补拉的接收器默认关闭，只有开机且开关打开时才临时启用，避免每次亮屏都拉起进程。
+      -->
+      <receiver
+        android:name=".boot.BootReceiver"
+        android:enabled="true"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.intent.action.BOOT_COMPLETED" />
+          <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        </intent-filter>
+      </receiver>
+      <receiver
+        android:name=".boot.UserPresentReceiver"
+        android:enabled="false"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.intent.action.USER_PRESENT" />
+        </intent-filter>
+      </receiver>
       <activity
         android:name=".MainActivity"
         android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|density"

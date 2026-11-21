@@ -1,5 +1,5 @@
 import { hideDesktopLyric } from './desktopLyric'
-import { exitApp as utilExitApp } from '@/utils/nativeModules/utils'
+import { exitApp as utilExitApp, setBootAutostart } from '@/utils/nativeModules/utils'
 import { destroy as destroyPlayer } from '@/plugins/player/utils'
 import { initSetting as initAppSetting } from '@/config/setting'
 import { setLanguage as applyLanguage } from '@/lang/i18n'
@@ -28,6 +28,7 @@ const throttleSaveSetting = throttle(() => {
 export const initSetting = async() => {
   const setting = (await initAppSetting()).setting
   settingActions.updateSetting(setting)
+  setBootAutostart(!!setting['player.bootAutostart'])
   return setting
 }
 
@@ -38,6 +39,9 @@ export const initSetting = async() => {
 export const updateSetting = (setting: Partial<LX.AppSetting>) => {
   settingActions.updateSetting(setting)
   throttleSaveSetting()
+  if (typeof setting['player.bootAutostart'] == 'boolean') {
+    setBootAutostart(setting['player.bootAutostart'])
+  }
 }
 
 export const setLanguage = (locale: Parameters<typeof applyLanguage>[0]) => {

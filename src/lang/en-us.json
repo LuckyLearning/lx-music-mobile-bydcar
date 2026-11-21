@@ -292,6 +292,8 @@
   "setting_basic_sourcename_alias": "Alias",
   "setting_basic_sourcename_real": "Original",
   "setting_basic_sourcename_title": "Choose the music streaming service name",
+  "setting_basic_boot_autostart": "Start on boot",
+  "setting_basic_boot_autostart_tip": "Opens the app when the head unit boots, through the same startup path as tapping the icon. It does not change lyrics or start playback by itself. Off by default. If the boot screen swallows that first open, it tries again while the screen is on during the next 10 minutes, and stops once the app has already come to the front.\n\nIf it still does not appear, allow autostart under Settings → Apps → LX Music. On Android 10 and later the system can block a background open unless “Display over other apps” is granted; desktop lyrics use that same permission.",
   "setting_basic_startup_auto_play": "Automatically play music on startup",
   "setting_basic_startup_push_play_detail_screen": "Open the playback detail page on startup",
   "setting_basic_theme": "Theme",

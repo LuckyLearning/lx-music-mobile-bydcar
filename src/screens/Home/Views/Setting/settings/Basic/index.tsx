@@ -7,6 +7,7 @@ import SourceName from './SourceName'
 import Language from './Language'
 import FontSize from './FontSize'
 import ShareType from './ShareType'
+import IsBootAutostart from './IsBootAutostart'
 import IsStartupAutoPlay from './IsStartupAutoPlay'
 import IsStartupPushPlayDetailScreen from './IsStartupPushPlayDetailScreen'
 import IsAutoHidePlayBar from './IsAutoHidePlayBar'
@@ -25,6 +26,7 @@ export default memo(() => {
 
   return (
     <Section title={t('setting_basic')}>
+      <IsBootAutostart />
       <IsStartupAutoPlay />
       <IsStartupPushPlayDetailScreen />
       <IsShowBackBtn />
