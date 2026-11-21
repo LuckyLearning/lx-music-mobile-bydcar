@@ -32,7 +32,9 @@ import java.io.File;
 import java.util.Locale;
 import java.util.Objects;
 
+import cn.toside.music.mobile.boot.BootPlaybackService;
 import cn.toside.music.mobile.boot.BootPrefs;
+import cn.toside.music.mobile.boot.BootStatus;
 import cn.toside.music.mobile.boot.BootWindow;
 
 public class UtilsModule extends ReactContextBaseJavaModule {
@@ -53,6 +55,7 @@ public class UtilsModule extends ReactContextBaseJavaModule {
   public String getName() {
     return "UtilsModule";
   }
+
 
   @ReactMethod
   public void addListener(String eventName) {
@@ -370,10 +373,43 @@ public class UtilsModule extends ReactContextBaseJavaModule {
     }).start();
   }
 
+  @ReactMethod(isBlockingSynchronousMethod = true)
+  public boolean isBootPlaybackRunning() {
+    return BootPlaybackService.isRunning();
+  }
+
   @ReactMethod
   public void setBootAutostart(boolean enabled) {
     BootPrefs.setEnabled(reactContext, enabled);
-    if (!enabled) BootWindow.disarm(reactContext);
+    if (!enabled) {
+      BootPlaybackService.cancelPending();
+      if (BootPlaybackService.isRunning()) BootStatus.markResult(reactContext, false, "已取消（开机自启已关闭）");
+      BootWindow.disarm(reactContext);
+    }
+  }
+
+  @ReactMethod(isBlockingSynchronousMethod = true)
+  public boolean isBootTaskCurrent(int token) {
+    return BootPrefs.isEnabled(reactContext) && BootPlaybackService.isTaskCurrent(token);
+  }
+
+  @ReactMethod
+  public void finishBootAutostart(int token, boolean ok, String reason) {
+    if (BootPrefs.isEnabled(reactContext) && BootPlaybackService.isTaskCurrent(token)) {
+      BootStatus.markResult(reactContext, ok, reason == null ? "" : reason);
+    }
+    BootPlaybackService.finishIfRunning(token);
+  }
+
+  @ReactMethod
+  public void getBootStatus(Promise promise) {
+    BootStatus.Snapshot snap = BootStatus.snapshot(reactContext);
+    WritableMap map = Arguments.createMap();
+    map.putDouble("at", snap.atMillis);
+    map.putString("action", snap.action);
+    map.putString("ok", snap.ok == null ? "pending" : (snap.ok ? "true" : "false"));
+    map.putString("reason", snap.reason);
+    promise.resolve(map);
   }
 
   @ReactMethod

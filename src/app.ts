@@ -7,6 +7,11 @@ import { exitApp } from './utils/nativeModules/utils'
 import { windowSizeTools } from './utils/windowSizeTools'
 import { listenLaunchEvent } from './navigation/regLaunchedEvent'
 import { tipDialog } from './utils/tools'
+import { setBootBackground } from '@/core/boot/mode'
+import { isBootPlaybackRunning } from './utils/nativeModules/utils'
+
+// Headless 任务在 index.js 里、导入本文件之前注册。
+if (isBootPlaybackRunning()) setBootBackground(true)
 
 console.log('starting app...')
 listenLaunchEvent()
@@ -48,6 +53,8 @@ void Promise.all([getFontSize(), windowSizeTools.init()]).then(async([fontSize])
   const { init: initNavigation, navigations } = await import('@/navigation')
 
   initNavigation(async() => {
+    // RNN 7.39.2 只在 Activity resumed 后发 appLaunched。
+    // 用户主动打开时必须建 root，即使开机任务仍在运行；不能消费掉这次唯一的 launch 事件。
     await handleInit()
     if (!isInited) return
     // import('@/utils/nativeModules/cryptoTest')

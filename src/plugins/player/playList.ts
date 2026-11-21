@@ -168,14 +168,14 @@ const handlePlayMusic = async(musicInfo: LX.Player.PlayMusic, url: string, time:
       // TODO startupAutoPlay
       // if (startupAutoPlay) store.dispatch(playerAction.playMusic())
       } else {
-        await TrackPlayer.play()
+        if (!global.lx.isPlayedStop) await TrackPlayer.play()
       }
     }
   } else {
     await TrackPlayer.pause()
     if (!isTempTrack(track.id as string)) {
       await TrackPlayer.seekTo(time)
-      await TrackPlayer.play()
+      if (!global.lx.isPlayedStop) await TrackPlayer.play()
     }
   }
 

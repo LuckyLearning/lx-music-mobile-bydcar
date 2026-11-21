@@ -1,16 +1,20 @@
 package cn.toside.music.mobile.boot;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
-import android.provider.Settings;
 import android.util.Log;
 
-import cn.toside.music.mobile.MainActivity;
-
 /**
- * 把主界面拉起来。走和用户点图标一样的入口，不附加额外参数，
- * 因此「启动后自动播放」「桌面歌词」等既有启动逻辑保持原样。
+ * 开机后只拉播放服务，不打开主界面。
+ *
+ * 必须用 {@code startService}，不能用 {@code startForegroundService}。
+ * 后者要求 5 秒内调用 {@code startForeground()}；冷启动时读列表、建播放器、取在线地址
+ * 在车机上经常超过 5 秒，结果是
+ * {@code Context.startForegroundService() did not then call Service.startForeground()}。
+ * 听风在 2026-10-18 用模拟器复现过，真机更慢。
+ * {@code BOOT_COMPLETED} 接收器自带临时白名单，允许直接 {@code startService}。
+ * 前台通知由服务自己在 {@code onStartCommand} 里贴；若需要出声，播放通知由播放器起播时再贴。
  */
 public final class BootLaunch {
 
@@ -18,20 +22,23 @@ public final class BootLaunch {
 
   private BootLaunch() {}
 
-  public static void start(Context context) {
+  public static void startInBackground(Context context) {
     Context app = context.getApplicationContext();
-    // targetSdk 29：Android 10 起，没有悬浮窗权限时后台 startActivity 经常被静默丢掉。
-    // 仍然试一次，部分车机在「自启动」白名单里会放行。
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(app)) {
-      Log.w(TAG, "no overlay permission; Android 10+ may block this background activity start");
-    }
-    Intent launch = new Intent(app, MainActivity.class);
-    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    Intent intent = new Intent(app, BootPlaybackService.class);
+    intent.setAction(BootPlaybackService.ACTION_AUTOPLAY);
     try {
-      app.startActivity(launch);
-      Log.i(TAG, "started MainActivity");
+      ComponentName started = app.startService(intent);
+      if (started == null) {
+        Log.w(TAG, "startService returned null");
+        BootStatus.markResult(app, false, "服务没起来");
+        return;
+      }
+      Log.i(TAG, "started BootPlaybackService");
     } catch (RuntimeException error) {
-      Log.w(TAG, "startActivity failed: " + error.getMessage());
+      Log.w(TAG, "startService failed", error);
+      String message = error.getMessage();
+      if (message == null || message.length() == 0) message = error.getClass().getSimpleName();
+      BootStatus.markResult(app, false, "服务没起来：" + message);
     }
   }
 }

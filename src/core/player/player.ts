@@ -28,6 +28,7 @@ import { checkIgnoringBatteryOptimization, checkNotificationPermission, debounce
 import { LIST_IDS } from '@/config/constant'
 import { addListMusics, removeListMusics } from '@/core/list'
 import { addDislikeInfo } from '@/core/dislikeList'
+import { isBootBackground, isBootCancelled } from '@/core/boot/mode'
 
 // import { checkMusicFileAvailable } from '@renderer/utils/music'
 
@@ -164,7 +165,7 @@ const handleRestorePlay = async(restorePlayInfo: LX.Player.SavedPlayInfo) => {
 
   const playMusicInfo = playerState.playMusicInfo
 
-  void initTrackInfo(musicInfo, playerState.musicInfo)
+  await initTrackInfo(musicInfo, playerState.musicInfo)
 
   void getPicPath({ musicInfo, listId: playMusicInfo.listId }).then((url: string) => {
     if (
@@ -227,9 +228,13 @@ const debouncePlay = debounceBackgroundTimer((musicInfo: LX.Player.PlayMusic) =>
 
 // 处理音乐播放
 const handlePlay = async() => {
+  if (isBootCancelled()) return
   if (!isInitialized()) {
-    await checkNotificationPermission()
-    void checkIgnoringBatteryOptimization()
+    // 开机时没有界面。权限框在无 Activity 时既弹不出来，也会把恢复播放卡住。
+    if (!isBootBackground()) {
+      await checkNotificationPermission()
+      void checkIgnoringBatteryOptimization()
+    }
     await playerInitial({
       volume: settingState.setting['player.volume'],
       playRate: settingState.setting['player.playbackRate'],
@@ -239,11 +244,12 @@ const handlePlay = async() => {
     })
   }
 
+  if (isBootCancelled()) return
   global.lx.isPlayedStop &&= false
   resetRandomNextMusicInfo()
 
   if (global.lx.restorePlayInfo) {
-    void handleRestorePlay(global.lx.restorePlayInfo)
+    await handleRestorePlay(global.lx.restorePlayInfo)
     global.lx.restorePlayInfo = null
     return
   }
