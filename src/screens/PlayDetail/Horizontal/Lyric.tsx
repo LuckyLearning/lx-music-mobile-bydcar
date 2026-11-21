@@ -11,6 +11,7 @@ import { getFontStyle } from '@/theme/fonts'
 import playerState from '@/store/player/state'
 import { scrollTo } from '@/utils/scroll'
 import PlayLine, { type PlayLineType } from '../components/PlayLine'
+import { calcHorizontalLyricSize } from '../lrcFontSize'
 // import { screenkeepAwake } from '@/utils/nativeModules/utils'
 // import { log } from '@/utils/log'
 // import { toast } from '@/utils/tools'
@@ -29,8 +30,7 @@ const LrcLine = memo(({ line, lineNum, activeLine, onLayout }: LineProps) => {
   const textAlign = useSettingValue('playDetail.style.align')
   const distance = lineNum - activeLine
   const active = distance == 0
-  // 保留用户的歌词字号比例，以默认 220 对应新版 20 / 36px。
-  const size = (active ? 36 : distance == 1 ? 22 : 20) * lrcFontSize / 220
+  const size = calcHorizontalLyricSize(lrcFontSize, distance)
   const lineHeight = sp(size) * 1.3
 
   // 设计稿以主文字色逐级淡出，避免次级灰再叠加原生渐隐后接近全黑。
