@@ -106,10 +106,10 @@ export interface BootStatusSnapshot {
 }
 
 /** 开机后台启动的结论。服务据此撤掉启动通知。 */
-export const finishBootAutostart = (ok: boolean, reason: string) => {
+export const finishBootAutostart = (token: number, ok: boolean, reason: string) => {
   if (Platform.OS !== 'android' || typeof UtilsModule?.finishBootAutostart !== 'function') return
   try {
-    UtilsModule.finishBootAutostart(ok, reason)
+    UtilsModule.finishBootAutostart(token, ok, reason)
   } catch (err) {
     console.log('LXBoot finishBootAutostart failed', err)
   }
@@ -138,3 +138,9 @@ export const requestIgnoreBatteryOptimization = async() => new Promise<boolean>(
     resolve(false)
   })
 })
+
+/** Live generation check: a disabled switch or destroyed native task invalidates pending JS work. */
+export const isBootTaskCurrent = (token: number): boolean => {
+  if (Platform.OS !== 'android' || typeof UtilsModule?.isBootTaskCurrent !== 'function') return false
+  return UtilsModule.isBootTaskCurrent(token) === true
+}
