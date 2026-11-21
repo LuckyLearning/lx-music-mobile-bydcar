@@ -1,6 +1,7 @@
 import { getPlayInfo } from '@/utils/data'
 import { getListMusics } from '@/core/list'
 import { playList, play } from '@/core/player/player'
+import { isBootBackground } from '@/core/boot/mode'
 
 
 export default async(setting: LX.AppSetting) => {
@@ -14,7 +15,8 @@ export default async(setting: LX.AppSetting) => {
 
   await playList(info.listId, info.index)
 
-  if (setting['player.startupAutoPlay']) setTimeout(play)
+  // 开机后台起播自己会播，而且不看这个开关。这里再播一次会和重试抢同一首歌。
+  if (setting['player.startupAutoPlay'] && !isBootBackground()) setTimeout(play)
 
 
   // if (!info.list || !info.list[info.index]) {

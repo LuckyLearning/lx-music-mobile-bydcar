@@ -7,6 +7,7 @@ import { isTempId, isEmpty } from './utils'
 import { exitApp } from '@/core/common'
 import { getCurrentTrackId } from './playList'
 import { pause, play, playNext, playPrev } from '@/core/player/player'
+import { isBootBackground } from '@/core/boot/mode'
 
 let isInitialized = false
 
@@ -122,6 +123,8 @@ const registerPlaybackService = async() => {
       await TrackPlayer.pause()
       global.app_event.playerPause()
       global.app_event.pause()
+      // 开机恢复会先摆上一段静音占位。把它当成播完会立刻切到下一首。
+      if (isBootBackground()) return
       global.app_event.playerEnded()
       global.app_event.playerEmptied()
       // if (retryTrack) {

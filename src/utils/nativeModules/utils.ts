@@ -87,6 +87,29 @@ export const setBootAutostart = (enabled: boolean) => {
   UtilsModule.setBootAutostart(enabled)
 }
 
+export interface BootStatusSnapshot {
+  at: number
+  action: string
+  /** `true` / `false` / `pending` */
+  ok: string
+  reason: string
+}
+
+/** 开机后台起播的结论。服务据此撤掉「正在恢复」通知。 */
+export const finishBootAutostart = (ok: boolean, reason: string) => {
+  if (Platform.OS !== 'android' || typeof UtilsModule?.finishBootAutostart !== 'function') return
+  try {
+    UtilsModule.finishBootAutostart(ok, reason)
+  } catch (err) {
+    console.log('LXBoot finishBootAutostart failed', err)
+  }
+}
+
+export const getBootStatus = async(): Promise<BootStatusSnapshot | null> => {
+  if (Platform.OS !== 'android' || typeof UtilsModule?.getBootStatus !== 'function') return null
+  return UtilsModule.getBootStatus()
+}
+
 export const isIgnoringBatteryOptimization = async(): Promise<boolean> => {
   return UtilsModule.isIgnoringBatteryOptimization()
 }

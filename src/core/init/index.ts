@@ -31,8 +31,9 @@ const handlePushedHomeScreen = async() => {
 }
 
 let isInited = false
-export default async() => {
-  if (isInited) return handlePushedHomeScreen
+let inflight: Promise<void> | null = null
+
+const doInit = async() => {
   bootLog('Initing...')
   commonActions.setFontSize(global.lx.fontSize)
   bootLog('Font size changed.')
@@ -65,7 +66,22 @@ export default async() => {
 
   // syncSetting()
 
-  isInited ||= true
+  isInited = true
+}
 
+/**
+ * 开机后台任务和用户点开应用可能撞在同一次初始化上。
+ * 初始化完成后按当前的字号再写一次：后台任务起来时界面字号可能还没读到。
+ */
+export default async() => {
+  if (!isInited) {
+    if (!inflight) {
+      inflight = doInit().finally(() => {
+        inflight = null
+      })
+    }
+    await inflight
+  }
+  commonActions.setFontSize(global.lx.fontSize)
   return handlePushedHomeScreen
 }

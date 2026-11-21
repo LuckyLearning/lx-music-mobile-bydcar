@@ -28,6 +28,7 @@ import { checkIgnoringBatteryOptimization, checkNotificationPermission, debounce
 import { LIST_IDS } from '@/config/constant'
 import { addListMusics, removeListMusics } from '@/core/list'
 import { addDislikeInfo } from '@/core/dislikeList'
+import { isBootBackground } from '@/core/boot/mode'
 
 // import { checkMusicFileAvailable } from '@renderer/utils/music'
 
@@ -228,8 +229,11 @@ const debouncePlay = debounceBackgroundTimer((musicInfo: LX.Player.PlayMusic) =>
 // 处理音乐播放
 const handlePlay = async() => {
   if (!isInitialized()) {
-    await checkNotificationPermission()
-    void checkIgnoringBatteryOptimization()
+    // 开机时没有界面。权限框在无 Activity 时既弹不出来，也会把恢复播放卡住。
+    if (!isBootBackground()) {
+      await checkNotificationPermission()
+      void checkIgnoringBatteryOptimization()
+    }
     await playerInitial({
       volume: settingState.setting['player.volume'],
       playRate: settingState.setting['player.playbackRate'],

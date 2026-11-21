@@ -32,7 +32,9 @@ import java.io.File;
 import java.util.Locale;
 import java.util.Objects;
 
+import cn.toside.music.mobile.boot.BootPlaybackService;
 import cn.toside.music.mobile.boot.BootPrefs;
+import cn.toside.music.mobile.boot.BootStatus;
 import cn.toside.music.mobile.boot.BootWindow;
 
 public class UtilsModule extends ReactContextBaseJavaModule {
@@ -374,6 +376,23 @@ public class UtilsModule extends ReactContextBaseJavaModule {
   public void setBootAutostart(boolean enabled) {
     BootPrefs.setEnabled(reactContext, enabled);
     if (!enabled) BootWindow.disarm(reactContext);
+  }
+
+  @ReactMethod
+  public void finishBootAutostart(boolean ok, String reason) {
+    BootStatus.markResult(reactContext, ok, reason == null ? "" : reason);
+    BootPlaybackService.finishIfRunning();
+  }
+
+  @ReactMethod
+  public void getBootStatus(Promise promise) {
+    BootStatus.Snapshot snap = BootStatus.snapshot(reactContext);
+    WritableMap map = Arguments.createMap();
+    map.putDouble("at", snap.atMillis);
+    map.putString("action", snap.action);
+    map.putString("ok", snap.ok == null ? "pending" : (snap.ok ? "true" : "false"));
+    map.putString("reason", snap.reason);
+    promise.resolve(map);
   }
 
   @ReactMethod

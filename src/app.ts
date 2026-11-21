@@ -1,3 +1,4 @@
+import { AppRegistry } from 'react-native'
 import '@/utils/errorHandle'
 import { init as initLog } from '@/utils/log'
 import { bootLog, getBootLog } from '@/utils/bootLog'
@@ -7,6 +8,11 @@ import { exitApp } from './utils/nativeModules/utils'
 import { windowSizeTools } from './utils/windowSizeTools'
 import { listenLaunchEvent } from './navigation/regLaunchedEvent'
 import { tipDialog } from './utils/tools'
+
+// 名字与 BootPlaybackService.TASK_NAME 一致。任务体延后加载，避免开机路径把界面初始化提前拉进来。
+AppRegistry.registerHeadlessTask('BootAutostart', () => (data: { delays?: number[], confirmMs?: number }) => {
+  return import('@/core/boot/background').then(({ runBackgroundAutostart }) => runBackgroundAutostart(data))
+})
 
 console.log('starting app...')
 listenLaunchEvent()

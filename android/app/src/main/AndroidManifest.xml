@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- [BYD] 开机自启。只收开机广播；开关默认关闭，关着时接收器里直接返回。 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- [BYD] 开机后台任务在取地址期间持有的短时唤醒锁。 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- [BYD] 桌面歌词前台服务保活所需权限 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
@@ -42,9 +44,10 @@
         android:exported="false"
         android:foregroundServiceType="mediaPlayback" />
       <!--
-        [BYD] 开机自启。exported 必须为 true，否则系统发不出 BOOT_COMPLETED。
+        [BYD] 开机后台起播。exported 必须为 true，否则系统发不出 BOOT_COMPLETED。
         QUICKBOOT_POWERON 是部分车机的快速开机，语义与 BOOT_COMPLETED 相同。
-        亮屏补拉的接收器默认关闭，只有开机且开关打开时才临时启用，避免每次亮屏都拉起进程。
+        收到广播后 startService 拉 BootPlaybackService，不打开主界面。
+        UserPresentReceiver 保持默认关闭：0.0.9 用它补拉界面，0.0.10 只在它还开着时把它关掉。
       -->
       <receiver
         android:name=".boot.BootReceiver"
@@ -63,6 +66,10 @@
           <action android:name="android.intent.action.USER_PRESENT" />
         </intent-filter>
       </receiver>
+      <service
+        android:name=".boot.BootPlaybackService"
+        android:exported="false"
+        android:foregroundServiceType="mediaPlayback" />
       <activity
         android:name=".MainActivity"
         android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|density"
