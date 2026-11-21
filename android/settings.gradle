@@ -1,4 +1,20 @@
 rootProject.name = 'cn.toside.music.mobile'
+
+// [BYD] 编译播放器模块前，把迪链歌词字段打进 react-native-track-player。
+def bydLyricPatch = new File(settingsDir, "../scripts/patch-track-player-byd-lyrics.mjs")
+def trackPlayerDir = new File(settingsDir, "../node_modules/react-native-track-player")
+if (bydLyricPatch.isFile() && trackPlayerDir.isDirectory()) {
+    def nodeBinary = System.getenv("NODE_BINARY") ?: "node"
+    def patchProcess = [nodeBinary, bydLyricPatch.absolutePath].execute(null, settingsDir)
+    def patchOut = new StringBuilder()
+    def patchErr = new StringBuilder()
+    patchProcess.waitForProcessOutput(patchOut, patchErr)
+    if (patchProcess.exitValue() != 0) {
+        throw new GradleException("BYD lyric patch failed:\n${patchOut}\n${patchErr}")
+    }
+    if (patchOut.toString().trim()) println patchOut.toString().trim()
+}
+
 apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')

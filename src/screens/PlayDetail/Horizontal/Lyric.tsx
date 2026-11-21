@@ -1,4 +1,4 @@
-import { memo, useMemo, useEffect, useRef, useCallback } from 'react'
+import { memo, useMemo, useEffect, useRef, useCallback, useState } from 'react'
 import { View, FlatList, StyleSheet, type FlatListProps, type NativeSyntheticEvent, type NativeScrollEvent, type LayoutChangeEvent } from 'react-native'
 // import { useLayout } from '@/utils/hooks'
 import { type Line, useLrcPlay, useLrcSet } from '@/plugins/lyric'
@@ -74,14 +74,23 @@ const wait = async() => new Promise(resolve => setTimeout(resolve, 100))
 interface LyricProps {
   /** 用户拖动歌词时通知外部（自动跟行不计入） */
   onInteraction?: () => void
+  /**
+   * 歌词栏比可视高度更宽时，按栏宽 100% 留白会把句子顶出屏幕。
+   * 打开后留白改为可视高度的 42%，不滚动也能看到当前句。
+   */
+  fitViewport?: boolean
 }
 
-export default ({ onInteraction }: LyricProps) => {
+export default ({ onInteraction, fitViewport = false }: LyricProps) => {
   const lyricLines = useLrcSet()
   const { line } = useLrcPlay()
   const flatListRef = useRef<FlatList>(null)
   const playLineRef = useRef<PlayLineType>(null)
   const isPauseScrollRef = useRef(true)
+  const fitViewportRef = useRef(fitViewport)
+  fitViewportRef.current = fitViewport
+  const viewportHeightRef = useRef(0)
+  const [viewportSpace, setViewportSpace] = useState(0)
   const scrollTimoutRef = useRef<NodeJS.Timeout | null>(null)
   const delayScrollTimeout = useRef<NodeJS.Timeout | null>(null)
   const lineRef = useRef({ line: 0, prevLine: 0 })
@@ -105,6 +114,21 @@ export default ({ onInteraction }: LyricProps) => {
   // const imgWidth = useMemo(() => layout.width * 0.75, [layout.width])
   const handleScrollToActive = (index = lineRef.current.line) => {
     if (index < 0) return
+    if (fitViewportRef.current && flatListRef.current) {
+      let offset = listLayoutInfoRef.current.spaceHeight
+      for (let line = 0; line < index; line++) {
+        offset += listLayoutInfoRef.current.lineHeights[line] ?? 0
+      }
+      offset += (listLayoutInfoRef.current.lineHeights[index] ?? 0) / 2
+      const target = Math.max(0, offset - viewportHeightRef.current * 0.42)
+      try {
+        flatListRef.current.scrollToOffset({
+          offset: target,
+          animated: listLayoutInfoRef.current.lineHeights[index] != null,
+        })
+      } catch {}
+      return
+    }
     if (flatListRef.current) {
       // console.log('handleScrollToActive', index)
       if (scrollInfoRef.current && lineRef.current.line - lineRef.current.prevLine == 1) {
@@ -252,9 +276,26 @@ export default ({ onInteraction }: LyricProps) => {
     playLineRef.current?.updateLayoutInfo(listLayoutInfoRef.current)
   }, [])
 
+  const scrollToActiveRef = useRef(handleScrollToActive)
+  scrollToActiveRef.current = handleScrollToActive
+
+  const handleListLayout = useCallback(({ nativeEvent }: LayoutChangeEvent) => {
+    if (!fitViewportRef.current) return
+    const height = nativeEvent.layout.height
+    if (height === viewportHeightRef.current) return
+    viewportHeightRef.current = height
+    setViewportSpace(Math.round(height * 0.42))
+  }, [])
+
   const handleSpaceLayout = useCallback(({ nativeEvent }: LayoutChangeEvent) => {
-    listLayoutInfoRef.current.spaceHeight = nativeEvent.layout.height
+    const height = nativeEvent.layout.height
+    const changed = listLayoutInfoRef.current.spaceHeight !== height
+    listLayoutInfoRef.current.spaceHeight = height
     playLineRef.current?.updateLayoutInfo(listLayoutInfoRef.current)
+    if (!fitViewportRef.current || !changed || isPauseScrollRef.current) return
+    requestAnimationFrame(() => {
+      scrollToActiveRef.current()
+    })
   }, [])
 
   const handlePlayLine = useCallback((time: number) => {
@@ -269,9 +310,13 @@ export default ({ onInteraction }: LyricProps) => {
   }
   const getkey: FlatListType['keyExtractor'] = (item, index) => `${index}${item.text}`
 
-  const spaceComponent = useMemo(() => (
-    <View style={styles.space} onLayout={handleSpaceLayout}></View>
-  ), [handleSpaceLayout])
+  const spaceStyle = useMemo(
+    () => (fitViewport ? { height: viewportSpace } : styles.space),
+    [fitViewport, viewportSpace],
+  )
+  const Space = useCallback(() => (
+    <View style={spaceStyle} onLayout={handleSpaceLayout} />
+  ), [spaceStyle, handleSpaceLayout])
 
   return (
     <>
@@ -281,9 +326,11 @@ export default ({ onInteraction }: LyricProps) => {
         keyExtractor={getkey}
         style={styles.container}
         ref={flatListRef}
+        onLayout={handleListLayout}
+        {...(fitViewport ? { removeClippedSubviews: false } : {})}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={spaceComponent}
-        ListFooterComponent={spaceComponent}
+        ListHeaderComponent={Space}
+        ListFooterComponent={Space}
         onScrollBeginDrag={handleScrollBeginDrag}
         onScrollEndDrag={onScrollEndDrag}
         fadingEdgeLength={px(32)}

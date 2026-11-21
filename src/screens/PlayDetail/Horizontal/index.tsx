@@ -71,7 +71,7 @@ export default memo(({ componentId }: { componentId: string }) => {
                 <Secondary />
               </View>
               <View style={{ width: px(440), height: px(340) }}>
-                <Lyric />
+                <Lyric fitViewport />
               </View>
             </View>
           </View>
