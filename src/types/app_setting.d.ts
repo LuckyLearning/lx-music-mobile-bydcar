@@ -118,7 +118,8 @@ declare global {
 
       /**
        * 开机自启。默认关闭，仅 Android 生效。
-       * 打开后开机在后台恢复上次播放，不打开主界面，也不看 startupAutoPlay。
+       * 打开后开机在后台拉起播放服务，不打开主界面。
+       * 是否出声看 player.startupAutoPlay，不会单独强制起播。
        */
       'player.bootAutostart': boolean
 
