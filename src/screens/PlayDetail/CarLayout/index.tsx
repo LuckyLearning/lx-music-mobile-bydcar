@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { AppState, LayoutAnimation, Platform, TouchableOpacity, UIManager, View } from 'react-native'
 import { screenkeepAwake, screenUnkeepAwake } from '@/utils/nativeModules/utils'
-import { AmbientBackground, CarText } from '@/components/car'
+import { AmbientBackground, CarText, IconButton } from '@/components/car'
 import { Icon } from '@/components/common/Icon'
 import { setComponentId } from '@/core/common'
 import { COMPONENT_IDS, NAV_SHEAR_NATIVE_IDS } from '@/config/constant'
@@ -16,8 +16,10 @@ import { useI18n } from '@/lang'
 import useWindowSize from '@/utils/hooks/useWindowSize'
 import { CAR_CONTROLS_IDLE_MS, CAR_DOCK_RESERVE_DP } from '../playerLayout'
 import Lyric from '../Horizontal/Lyric'
+import SettingPopup, { type SettingPopupType } from '../Horizontal/components/SettingPopup'
 import Cover from './Cover'
 import Controls from './Controls'
+import { createControlsIdleController } from './controlsIdle'
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true)
@@ -34,32 +36,36 @@ const animateLayout = () => {
 
 const useControlsIdle = () => {
   const [visible, setVisible] = useState(true)
-  const visibleRef = useRef(true)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const controllerRef = useRef<ReturnType<typeof createControlsIdleController> | null>(null)
+  if (!controllerRef.current) {
+    controllerRef.current = createControlsIdleController(CAR_CONTROLS_IDLE_MS, {
+      onVisibleChange(nextVisible) {
+        animateLayout()
+        setVisible(nextVisible)
+      },
+    })
+  }
 
   const noteInteraction = useCallback(() => {
-    if (!visibleRef.current) {
-      visibleRef.current = true
-      animateLayout()
-      setVisible(true)
-    }
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null
-      visibleRef.current = false
-      animateLayout()
-      setVisible(false)
-    }, CAR_CONTROLS_IDLE_MS)
+    controllerRef.current?.noteInteraction()
+  }, [])
+
+  const pauseIdle = useCallback(() => {
+    controllerRef.current?.pause()
+  }, [])
+
+  const resumeIdle = useCallback(() => {
+    controllerRef.current?.resume()
   }, [])
 
   useEffect(() => {
-    noteInteraction()
+    controllerRef.current?.noteInteraction()
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
+      controllerRef.current?.dispose()
     }
-  }, [noteInteraction])
+  }, [])
 
-  return { visible, noteInteraction }
+  return { visible, noteInteraction, pauseIdle, resumeIdle }
 }
 
 const BACK_SIZE = 56
@@ -84,7 +90,8 @@ export default memo(({ componentId }: { componentId: string }) => {
   const t = useI18n()
   useWindowSize()
   const statusBarHeight = useStatusbarHeight()
-  const { visible, noteInteraction } = useControlsIdle()
+  const { visible, noteInteraction, pauseIdle, resumeIdle } = useControlsIdle()
+  const settingPopupRef = useRef<SettingPopupType>(null)
 
   useEffect(() => {
     setComponentId(COMPONENT_IDS.playDetail, componentId)
@@ -118,6 +125,11 @@ export default memo(({ componentId }: { componentId: string }) => {
   const back = () => {
     noteInteraction()
     void pop(componentId)
+  }
+
+  const openSettings = () => {
+    pauseIdle()
+    settingPopupRef.current?.show()
   }
 
   return (
@@ -161,6 +173,21 @@ export default memo(({ componentId }: { componentId: string }) => {
           </View>
           {visible
             ? (
+                <IconButton
+                  icon="lucide-sliders-horizontal"
+                  iconSize={26}
+                  size={56}
+                  touchSize={64}
+                  background={theme['glass-strong']}
+                  color={theme['text-1']}
+                  accessibilityLabel={t('play_detail_setting_title')}
+                  onPress={openSettings}
+                  style={{ position: 'absolute', top: px(16), right: px(28), zIndex: 2, borderWidth: 1, borderColor: theme['art-stroke'] }}
+                />
+              )
+            : null}
+          {visible
+            ? (
                 <View nativeID={NAV_SHEAR_NATIVE_IDS.playDetail_player} collapsable={false}>
                   <Controls onInteraction={noteInteraction} />
                 </View>
@@ -173,6 +200,7 @@ export default memo(({ componentId }: { componentId: string }) => {
           collapsable={false}
           style={{ height: CAR_DOCK_RESERVE_DP }}
         />
+        <SettingPopup ref={settingPopupRef} position="right" direction="horizontal" onHide={resumeIdle} />
       </View>
     </PageContent>
   )

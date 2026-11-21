@@ -229,12 +229,17 @@ declare global {
       'playDetail.style.align': 'center' | 'left' | 'right'
 
       /**
-       * 竖屏歌词字体大小
+       * [BYD] 播放页歌词字号已从旧滑块刻度迁移为磅，保证只换算一次
+       */
+      'playDetail.style.fontUnit': 'pt'
+
+      /**
+       * 竖屏歌词字体大小（单位：磅）
        */
       'playDetail.vertical.style.lrcFontSize': number
 
       /**
-       * 横屏歌词字体大小
+       * 横屏/车机歌词字体大小（单位：磅）
        */
       'playDetail.horizontal.style.lrcFontSize': number
 

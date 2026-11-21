@@ -42,8 +42,10 @@ const defaultSetting: LX.AppSetting = {
   // 'playDetail.isZoomActiveLrc': false,
   // 'playDetail.isShowLyricProgressSetting': false,
   'playDetail.style.align': 'left',
-  'playDetail.vertical.style.lrcFontSize': 210,
-  'playDetail.horizontal.style.lrcFontSize': 220,
+  // [BYD] 播放页歌词字号单位为磅，不设上限；21 / 22 磅对应旧滑块 210 / 220。
+  'playDetail.style.fontUnit': 'pt',
+  'playDetail.vertical.style.lrcFontSize': 21,
+  'playDetail.horizontal.style.lrcFontSize': 22,
   'playDetail.isShowLyricProgressSetting': false,
 
   'desktopLyric.enable': false,

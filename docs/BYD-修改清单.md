@@ -57,12 +57,16 @@
 | `src/utils/nativeModules/utils.ts` | `setBootAutostart`，把开关交给原生 | `[BYD]` | 保留 |
 | `src/screens/.../Basic/index.tsx` | 基本设置挂上「开机自启」 | `[BYD]` | 保留 |
 | `src/lang/{zh-cn,zh-tw,en-us}.json` | `setting_basic_boot_autostart` 与说明 | `[BYD]` | 保留 |
-| `package.json` | `version`=`0.0.10`、`versionCode`=`10` | — | 车机线版本，勿被上游 1.9.x 覆盖 |
+| `package.json` | `version`=`0.0.11`、`versionCode`=`11` | — | 车机线版本，勿被上游 1.9.x 覆盖 |
 | `src/config/defaultSetting.ts` | 新增悬浮窗样式与投屏屏默认值（7 项） | `// [BYD]` | 保留新增 7 行 |
 | `src/types/app_setting.d.ts` | 对应 7 个类型声明 | `[BYD]` | 保留 |
 | `src/core/desktopLyric.ts` | 透传新样式参数 + 导出 `setDesktopLyricBackground`/`LetterSpacing`/`Display`/`getDisplays` | `// [BYD]` | 保留 |
 | `src/utils/nativeModules/lyricDesktop.ts` | 桥接新方法 + 扩展 `showDesktopLyricView` 入参 | `[BYD]` | 保留 |
 | `src/screens/Home/Views/Setting/settings/LyricDesktop/index.tsx` | 注册 BgStyle/LetterSpacing/FontFamily/DisplaySelect | `[BYD]` | 保留 4 个新组件挂载 |
+| `src/config/defaultSetting.ts` / `src/config/setting.ts` / `src/config/migrateSetting.ts` | 播放页歌词字号改为磅（`playDetail.style.fontUnit`=`pt`，默认竖屏 21 / 横屏车机 22），最小 1 磅不设上限；先迁移旧值再合并默认设置 | `// [BYD]` | 保留字号迁移与 `pt` 默认值 |
+| `src/screens/PlayDetail/Vertical/Lyric.tsx` / `components/SettingPopup/settings/SettingLrcFontSize.tsx` | 竖屏播放页歌词字号改按磅读取与步进调整（无上限） | — | 保留按磅步进与渲染 |
+| `src/screens/PlayDetail/Horizontal/Lyric.tsx` / `components/SettingPopup/*` | 横屏/车机播放页歌词字号改按磅比例渲染与步进调整（无上限，步进在预览上方） | — | 保留 `pt` 步进与预览位置 |
+| `src/screens/PlayDetail/CarLayout/index.tsx` | 车机播放页右上角增加设置按钮，随底部控制栏 5 秒无操作一起自动隐藏、触屏一起恢复，打开 `SettingPopup` 期间暂停隐藏 | — | 保留右上角设置入口与显隐联动 |
 
 ### 新增文件（无冲突）
 
@@ -74,6 +78,9 @@
 | `index.js` / `src/registerBootTask.ts` | 在导入 `app.ts`（导航/界面）之前注册 Headless 任务 `BootAutostart` |
 | `src/core/boot/background.ts` / `mode.ts` / `plan.ts` | 无界面任务：`startupAutoPlay` 打开时按 0s / 4s / 10s 恢复上次播放；关掉则只就绪不强制起播。没有播放记录时不挑歌 |
 | `src/screens/Home/Views/Setting/settings/Basic/IsBootAutostart.tsx` | 基本设置里的「开机自启」，并显示上次开机结果 |
+| `src/config/migratePlayDetail.ts` | 播放页旧滑块字号（100..300）一次性迁移为磅 |
+| `src/screens/PlayDetail/lrcFontSize.ts` | 播放页歌词磅值归一化、步进、横竖屏字号换算（无上限） |
+| `src/screens/PlayDetail/CarLayout/controlsIdle.ts` | 车机播放页右上角设置与底栏共用的 5 秒自动隐藏/触控恢复/弹窗暂停状态机 |
 | `src/screens/Home/Views/Setting/settings/LyricDesktop/BgStyle.tsx` | 背景/边框样式（色块+圆角/边框宽滑块） |
 | `src/screens/Home/Views/Setting/settings/LyricDesktop/LetterSpacing.tsx` | 字距滑块 |
 | `src/screens/Home/Views/Setting/settings/LyricDesktop/FontFamily.tsx` | 字体选择 |
@@ -103,7 +110,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | `0.0.10`（`package.json` 的 `version` / `versionCode` = `10`） |
+| 当前版本 | `0.0.11`（`package.json` 的 `version` / `versionCode` = `11`） |
 | 上游基线 | LX Music `v1.9.2`（`0669d1b`） |
 | 出包方式 | 打 tag `v0.0.1` → `[BYD] Build & Release` 工作流 → GitHub Release 挂 5 个 APK |
 | 发布形态 | 与 WindTone 一致：源码仓 Release 挂产物；**公共分发仓** `LuckyLearning/Release/LxMusic/`（`latest.json` + 版本目录，保留最近 5 版）供应用内更新与直链下载 |
