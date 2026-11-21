@@ -1,7 +1,7 @@
 import BackgroundTimer from 'react-native-background-timer'
 import TrackPlayer, { State } from 'react-native-track-player'
 
-import { setBootBackground } from '@/core/boot/mode'
+import { setBootBackground, isBootSession, isBootCancelled, cancelBootBackground, onBootCancel } from '@/core/boot/mode'
 import { planBootPlayback } from '@/core/boot/plan'
 import init from '@/core/init'
 import { getListMusics } from '@/core/list'
@@ -9,7 +9,8 @@ import { play, playList } from '@/core/player/player'
 import playerState from '@/store/player/state'
 import settingState from '@/store/setting/state'
 import { getPlayInfo } from '@/utils/data'
-import { finishBootAutostart } from '@/utils/nativeModules/utils'
+import { initial as preparePlayer } from '@/plugins/player'
+import { finishBootAutostart, isBootTaskCurrent } from '@/utils/nativeModules/utils'
 
 /**
  * 开机后台启动。听风那条路是 startService 拉播放服务、不打开主界面。
@@ -25,6 +26,7 @@ const DEFAULT_CONFIRM_MS = 8_000
 const PLACEHOLDER_TRACK = /\/\/default$/
 
 export interface BootTaskData {
+  token: number
   delays?: number[]
   confirmMs?: number
 }
@@ -36,9 +38,14 @@ interface Attempt {
   reason: string
 }
 
-const sleep = (ms: number) => new Promise<void>(resolve => {
-  BackgroundTimer.setTimeout(() => resolve(), ms)
-})
+const sleep = async(ms: number, checkCurrent: () => void) => {
+  const deadline = Date.now() + ms
+  do {
+    checkCurrent()
+    await new Promise<void>(resolve => { BackgroundTimer.setTimeout(resolve, Math.min(200, Math.max(0, deadline - Date.now()))) })
+  } while (Date.now() < deadline)
+  checkCurrent()
+}
 
 const text = (key: 'boot_autostart_no_history' | 'boot_autostart_missing_track' | 'boot_autostart_not_ready' | 'boot_autostart_prepared') => {
   return global.i18n?.t(key) ?? key
@@ -50,7 +57,7 @@ const normalizeDelays = (value: unknown): number[] => {
   return delays.length > 0 ? delays : DEFAULT_DELAYS
 }
 
-const waitForPlayback = async(confirmMs: number): Promise<boolean> => {
+const waitForPlayback = async(confirmMs: number, checkCurrent: () => void): Promise<boolean> => {
   const deadline = Date.now() + confirmMs
   while (Date.now() < deadline) {
     try {
@@ -62,17 +69,19 @@ const waitForPlayback = async(confirmMs: number): Promise<boolean> => {
     } catch {
       // 播放器还在 setup，下一拍再看。
     }
-    await sleep(400)
+    await sleep(400, checkCurrent)
   }
   return false
 }
 
-const attemptBootPlayback = async(confirmMs: number): Promise<Attempt> => {
+const attemptBootPlayback = async(confirmMs: number, checkCurrent: () => void): Promise<Attempt> => {
   const info = await getPlayInfo()
   if (!info?.listId || info.index < 0) {
     return { ok: false, terminal: true, reason: text('boot_autostart_no_history') }
   }
+  checkCurrent()
   const list = await getListMusics(info.listId)
+  checkCurrent()
   if (!list[info.index]) {
     return { ok: false, terminal: true, reason: text('boot_autostart_missing_track') }
   }
@@ -80,18 +89,56 @@ const attemptBootPlayback = async(confirmMs: number): Promise<Attempt> => {
     global.lx.restorePlayInfo = info
     await playList(info.listId, info.index)
   }
+  checkCurrent()
   play()
-  if (await waitForPlayback(confirmMs)) return { ok: true, terminal: true, reason: '' }
+  if (await waitForPlayback(confirmMs, checkCurrent)) return { ok: true, terminal: true, reason: '' }
   return { ok: false, terminal: false, reason: text('boot_autostart_not_ready') }
 }
 
-export async function runBackgroundAutostart(data?: BootTaskData) {
-  setBootBackground(true)
+export async function runBackgroundAutostart(data: BootTaskData) {
+  // Registration claims the generation before this lazy import settles.
+  if (!isBootSession(data.token) || !isBootTaskCurrent(data.token)) {
+    finishBootAutostart(data.token, false, 'boot_cancelled')
+    if (isBootSession(data.token)) setBootBackground(false)
+    return
+  }
   let ok = false
   let reason = ''
+  const token = data.token
+  const deadline = Date.now() + 75_000
+  const checkCurrent = () => {
+    if (!isBootSession(token)) throw new Error('boot_stale_session')
+    if (Date.now() >= deadline || !isBootTaskCurrent(token)) cancelBootBackground()
+    if (isBootCancelled()) throw new Error('boot_cancelled')
+  }
+  onBootCancel(() => {
+    // In-flight URL requests check this before setResource; avoid delayed audio after switch-off.
+    global.lx.isPlayedStop = true
+    if (global.lx.playerStatus.isInitialized) void TrackPlayer.pause().catch(() => {})
+  })
+  const watchdog = BackgroundTimer.setInterval(() => {
+    try { checkCurrent() } catch { BackgroundTimer.clearInterval(watchdog) }
+  }, 200)
   try {
+    checkCurrent()
     console.log('LXBoot background autostart')
     await init()
+    checkCurrent()
+    // Even with no history, keep the real media service ready (not just this short-lived task).
+    const setting = settingState.setting
+    await preparePlayer({
+      volume: setting['player.volume'],
+      playRate: setting['player.playbackRate'],
+      cacheSize: setting['player.cacheSize'] ? parseInt(setting['player.cacheSize']) : 0,
+      isHandleAudioFocus: setting['player.isHandleAudioFocus'],
+      isEnableAudioOffload: setting['player.isEnableAudioOffload'],
+    })
+    checkCurrent()
+    if (!playerState.playMusicInfo.musicInfo) {
+      // Pinned TrackPlayer keeps MusicService alive; replace its startup notification with a valid idle one.
+      await TrackPlayer.updateNowPlayingMetadata({ title: 'LX Music', artist: '' }, false)
+    }
+    checkCurrent()
     if (planBootPlayback(!!settingState.setting['player.startupAutoPlay']) === 'prepare') {
       // init 里已经按记录恢复了列表，这里不再调用 play()。
       ok = true
@@ -105,8 +152,10 @@ export async function runBackgroundAutostart(data?: BootTaskData) {
       : DEFAULT_CONFIRM_MS
     for (let attempt = 0; attempt < delays.length; attempt++) {
       const wait = delays[attempt] ?? 0
-      if (wait > 0) await sleep(wait)
-      const result = await attemptBootPlayback(confirmMs)
+      if (wait > 0) await sleep(wait, checkCurrent)
+      checkCurrent()
+      const result = await attemptBootPlayback(confirmMs, checkCurrent)
+      checkCurrent()
       reason = result.reason
       if (result.ok) {
         ok = true
@@ -121,9 +170,12 @@ export async function runBackgroundAutostart(data?: BootTaskData) {
     reason = message || 'init_failed'
     console.log('LXBoot background autostart failed', reason)
   } finally {
-    setBootBackground(false)
-    // 先让播放器自己的前台通知贴上，再撤「正在恢复」。否则进程会在两条通知的空档里被收掉。
-    if (ok) await sleep(500)
-    finishBootAutostart(ok, reason)
+    BackgroundTimer.clearInterval(watchdog)
+    // Real MusicService and restored track/idle notification are ready before handoff.
+    finishBootAutostart(token, ok, reason)
+    if (isBootSession(token)) {
+      onBootCancel(null)
+      setBootBackground(false)
+    }
   }
 }
