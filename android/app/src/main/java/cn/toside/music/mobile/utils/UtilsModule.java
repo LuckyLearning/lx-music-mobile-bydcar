@@ -381,13 +381,24 @@ public class UtilsModule extends ReactContextBaseJavaModule {
   @ReactMethod
   public void setBootAutostart(boolean enabled) {
     BootPrefs.setEnabled(reactContext, enabled);
-    if (!enabled) BootWindow.disarm(reactContext);
+    if (!enabled) {
+      BootPlaybackService.cancelPending();
+      if (BootPlaybackService.isRunning()) BootStatus.markResult(reactContext, false, "已取消（开机自启已关闭）");
+      BootWindow.disarm(reactContext);
+    }
+  }
+
+  @ReactMethod(isBlockingSynchronousMethod = true)
+  public boolean isBootTaskCurrent(int token) {
+    return BootPrefs.isEnabled(reactContext) && BootPlaybackService.isTaskCurrent(token);
   }
 
   @ReactMethod
-  public void finishBootAutostart(boolean ok, String reason) {
-    BootStatus.markResult(reactContext, ok, reason == null ? "" : reason);
-    BootPlaybackService.finishIfRunning();
+  public void finishBootAutostart(int token, boolean ok, String reason) {
+    if (BootPrefs.isEnabled(reactContext) && BootPlaybackService.isTaskCurrent(token)) {
+      BootStatus.markResult(reactContext, ok, reason == null ? "" : reason);
+    }
+    BootPlaybackService.finishIfRunning(token);
   }
 
   @ReactMethod
