@@ -25,12 +25,12 @@ import cn.toside.music.mobile.MainActivity;
 import cn.toside.music.mobile.R;
 
 /**
- * 开机后台起播。
+ * 开机后台启动。
  *
- * 播放逻辑在 JS（在线地址、上次列表都在那边），所以这里做两件事：
- * 立刻贴一条前台通知，让车机在取地址的那几秒里别把进程冻住；
- * 然后跑无界面的 JS 任务，按 {@link BootRetryPolicy} 恢复上次播放。
- * 任务结束或播放器自己的通知贴上之后，这条「正在恢复」通知就撤掉。
+ * 播放逻辑在 JS（在线地址、上次列表、是否自动播放都在那边），所以这里做两件事：
+ * 立刻贴一条前台通知，让车机在初始化的那几秒里别把进程冻住；
+ * 然后跑无界面的 JS 任务。是否出声由 JS 按「启动后自动播放」决定。
+ * 任务结束或播放器自己的通知贴上之后，这条启动通知就撤掉。
  *
  * 不在接收器里 {@code startForegroundService}：见 {@link BootLaunch}。
  */
@@ -45,6 +45,10 @@ public class BootPlaybackService extends HeadlessJsTaskService {
 
   private static volatile BootPlaybackService instance;
   private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+  public static boolean isRunning() {
+    return instance != null;
+  }
 
   public static void finishIfRunning() {
     BootPlaybackService service = instance;

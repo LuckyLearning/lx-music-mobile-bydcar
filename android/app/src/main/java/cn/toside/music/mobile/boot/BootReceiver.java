@@ -8,8 +8,8 @@ import android.util.Log;
 /**
  * 开机自启。
  *
- * 开关打开时只做一件事：{@code startService} 拉起播放服务，让它在后台恢复上次播放。
- * 不打开主界面。听风在同一台迪链上的后台自启就是这条路；
+ * 开关打开时只做一件事：{@code startService} 拉起播放服务。
+ * 不打开主界面。是否自动播放由 JS 看「启动后自动播放」。听风在同一台迪链上的后台自启就是这条路；
  * 0.0.9 的 {@code startActivity} 在 Android 12 上会被静默丢掉。
  *
  * exported 必须为 true：BOOT_COMPLETED 的发送方是系统进程，写成 false 时广播到不了。

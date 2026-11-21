@@ -6,7 +6,7 @@ package cn.toside.music.mobile.boot;
  * 0.0.9 在开关打开时拉起主界面。Android 10 起后台 {@code startActivity} 会被系统静默丢掉
  * （不抛异常），USER_PRESENT 也不在豁免名单里，迪链 5.0 又常常没有锁屏，补拉等于没做。
  * 听风在同一台车上的后台自启不打开界面：开机广播里 {@code startService} 拉播放服务。
- * 本应用是播放器，对应的就是「恢复上次播放」，而不是再试一次主界面。
+ * 本应用对应的也是拉播放服务，而不是再试一次主界面。出不出声由 JS 看「启动后自动播放」。
  */
 public final class BootPolicy {
 
@@ -28,7 +28,7 @@ public final class BootPolicy {
   public enum Kind {
     /** 什么都不做 */
     NONE,
-    /** 只拉播放服务，在后台恢复上次播放，不打开主界面 */
+    /** 只拉播放服务，不打开主界面。出不出声由 JS 决定。 */
     PLAY_IN_BACKGROUND,
   }
 
@@ -39,7 +39,7 @@ public final class BootPolicy {
   }
 
   /**
-   * 开关打开且是开机广播 → 后台起播。其它情况什么都不做。
+   * 开关打开且是开机广播 → 后台拉起播放服务。其它情况什么都不做。
    * 没有「打开主界面」这一档：那条路在这台车机上到不了前台。
    */
   public static Kind decide(String action, boolean enabled) {

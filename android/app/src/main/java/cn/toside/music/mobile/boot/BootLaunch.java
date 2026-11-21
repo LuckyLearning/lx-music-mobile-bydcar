@@ -14,7 +14,7 @@ import android.util.Log;
  * {@code Context.startForegroundService() did not then call Service.startForeground()}。
  * 听风在 2026-10-18 用模拟器复现过，真机更慢。
  * {@code BOOT_COMPLETED} 接收器自带临时白名单，允许直接 {@code startService}。
- * 前台通知由服务自己在 {@code onStartCommand} 里贴，播放通知由播放器起播时再贴。
+ * 前台通知由服务自己在 {@code onStartCommand} 里贴；若需要出声，播放通知由播放器起播时再贴。
  */
 public final class BootLaunch {
 
