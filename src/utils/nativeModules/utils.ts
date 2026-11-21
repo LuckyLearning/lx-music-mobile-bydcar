@@ -1,4 +1,4 @@
-import { AppState, NativeEventEmitter, NativeModules } from 'react-native'
+import { AppState, NativeEventEmitter, NativeModules, Platform } from 'react-native'
 
 const { UtilsModule } = NativeModules
 
@@ -79,6 +79,12 @@ export const onWindowSizeChange = (handler: (size: { width: number, height: numb
   return () => {
     eventListener.remove()
   }
+}
+
+/** 把「开机自启」写进原生偏好。开机广播到达时 JS 还没起来，接收器只读这份值。iOS 无此能力。 */
+export const setBootAutostart = (enabled: boolean) => {
+  if (Platform.OS !== 'android' || typeof UtilsModule?.setBootAutostart !== 'function') return
+  UtilsModule.setBootAutostart(enabled)
 }
 
 export const isIgnoringBatteryOptimization = async(): Promise<boolean> => {

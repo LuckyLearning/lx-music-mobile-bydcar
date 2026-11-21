@@ -292,6 +292,8 @@
   "setting_basic_sourcename_alias": "別名",
   "setting_basic_sourcename_real": "原名",
   "setting_basic_sourcename_title": "選取音樂串流平台名稱類型",
+  "setting_basic_boot_autostart": "開機自啟",
+  "setting_basic_boot_autostart_tip": "開機後自動打開本應用，和手動點一次圖示走同一條啟動流程，不額外改歌詞，也不會因此自動播放。預設關閉。若開機那一下被車機待機頁丟掉，亮屏後的 10 分鐘內還會再試，已經打開過就不再打斷。\n\n若開機後沒有出現：到車機「設定 → 應用管理 → LX Music」允許自啟動。Android 10 起，沒有「顯示在其他應用程式上層」時，系統可能攔掉這次背景開啟；桌面歌詞用的就是這項權限。",
   "setting_basic_startup_auto_play": "啟動後自動播放音樂",
   "setting_basic_startup_push_play_detail_screen": "啟動後自動開啟播放詳情頁",
   "setting_basic_theme": "主題顏色",

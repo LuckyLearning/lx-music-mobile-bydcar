@@ -198,6 +198,7 @@ dependencies {
     // 而车机工程 minSdk 仍是 21。2.4.0 依赖 appcompat 1.7.1，仍支持 API 21。
     // 坐标在 Maven Central；RN 0.73 已加入 mavenCentral，不另加仓库。
     implementation 'com.github.skydoves:colorpickerview:2.4.0'
+    testImplementation 'junit:junit:4.13.2'
 
   if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
