@@ -7,6 +7,7 @@ import { useI18n } from '@/lang'
 import { useTheme } from '@/store/theme/hook'
 import { useSettingValue } from '@/store/setting/hook'
 import { px } from './scale'
+import { calcHorizontalPreviewSize } from '../../../lrcFontSize'
 import SettingLyricProgress from './settings/SettingLyricProgress'
 import SettingVolume from './settings/SettingVolume'
 import SettingPlaybackRate from './settings/SettingPlaybackRate'
@@ -26,7 +27,6 @@ type SettingsTab = 'audio' | 'lyrics'
 const SettingsContent = ({ direction, tab }: Pick<SettingPopupProps, 'direction'> & { tab: SettingsTab }) => {
   const t = useI18n()
   const theme = useTheme()
-  const [previewSize, setPreviewSize] = useState<number | null>(null)
   const fontSize = useSettingValue(direction == 'horizontal' ? 'playDetail.horizontal.style.lrcFontSize' : 'playDetail.vertical.style.lrcFontSize')
   const align = useSettingValue('playDetail.style.align')
 
@@ -37,12 +37,13 @@ const SettingsContent = ({ direction, tab }: Pick<SettingPopupProps, 'direction'
         <View style={{ height: px(1), backgroundColor: theme.hairline }} />
         <SettingPlaybackRate />
       </> : <>
+        {/* 步进按钮置于预览上方，放大到超大字号时按键位置不随预览高度下移。 */}
+        <SettingLrcFontSize direction={direction} />
         <View style={{ minHeight: px(144), justifyContent: 'center', gap: px(12) }}>
           <SettingsText size={18} color={theme['text-2']} lineHeight={1.4}>{t('play_detail_setting_preview')}</SettingsText>
-          <SettingsText size={42 * (previewSize ?? fontSize) / 220} weight="600" lineHeight={1.3} numberOfLines={1} style={{ textAlign: align }}>{t('play_detail_setting_preview_lyric')}</SettingsText>
+          <SettingsText size={calcHorizontalPreviewSize(fontSize)} weight="600" lineHeight={1.3} numberOfLines={1} style={{ textAlign: align }}>{t('play_detail_setting_preview_lyric')}</SettingsText>
           <SettingsText size={24} color={theme['text-3']} lineHeight={1.4} numberOfLines={1} style={{ textAlign: align }}>{t('play_detail_setting_preview_next')}</SettingsText>
         </View>
-        <SettingLrcFontSize direction={direction} onPreview={setPreviewSize} />
         <SettingLrcAlign />
         <View style={{ height: px(1), backgroundColor: theme.hairline }} />
         <SettingLyricProgress />
