@@ -1,4 +1,3 @@
-import { AppRegistry } from 'react-native'
 import '@/utils/errorHandle'
 import { init as initLog } from '@/utils/log'
 import { bootLog, getBootLog } from '@/utils/bootLog'
@@ -8,11 +7,11 @@ import { exitApp } from './utils/nativeModules/utils'
 import { windowSizeTools } from './utils/windowSizeTools'
 import { listenLaunchEvent } from './navigation/regLaunchedEvent'
 import { tipDialog } from './utils/tools'
+import { isBootBackground, setBootBackground } from '@/core/boot/mode'
+import { isBootPlaybackRunning } from './utils/nativeModules/utils'
 
-// 名字与 BootPlaybackService.TASK_NAME 一致。任务体延后加载，避免开机路径把界面初始化提前拉进来。
-AppRegistry.registerHeadlessTask('BootAutostart', () => (data: { delays?: number[], confirmMs?: number }) => {
-  return import('@/core/boot/background').then(({ runBackgroundAutostart }) => runBackgroundAutostart(data))
-})
+// Headless 任务在 index.js 里、导入本文件之前注册。
+if (isBootPlaybackRunning()) setBootBackground(true)
 
 console.log('starting app...')
 listenLaunchEvent()
@@ -54,6 +53,11 @@ void Promise.all([getFontSize(), windowSizeTools.init()]).then(async([fontSize])
   const { init: initNavigation, navigations } = await import('@/navigation')
 
   initNavigation(async() => {
+    // 开机后台任务只起服务。若 RNN 在无界面时也触发了 launched，不要 setRoot 把主界面弹出来。
+    if (isBootBackground() || isBootPlaybackRunning()) {
+      console.log('LXBoot skip UI root during background autostart')
+      return
+    }
     await handleInit()
     if (!isInited) return
     // import('@/utils/nativeModules/cryptoTest')
