@@ -1,5 +1,5 @@
 import { hideDesktopLyric } from './desktopLyric'
-import { isBootBackground } from '@/core/boot/mode'
+import { isBootBackground, cancelBootBackground } from '@/core/boot/mode'
 import { exitApp as utilExitApp, setBootAutostart } from '@/utils/nativeModules/utils'
 import { destroy as destroyPlayer } from '@/plugins/player/utils'
 import { initSetting as initAppSetting } from '@/config/setting'
@@ -41,6 +41,7 @@ export const initSetting = async() => {
  * @param setting 新设置
  */
 export const updateSetting = (setting: Partial<LX.AppSetting>) => {
+  if (setting['player.bootAutostart'] === false) cancelBootBackground()
   settingActions.updateSetting(setting)
   throttleSaveSetting()
   if (typeof setting['player.bootAutostart'] == 'boolean') {
