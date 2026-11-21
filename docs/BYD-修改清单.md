@@ -48,7 +48,7 @@
 | `android/.../lyric/Lyric.java` | 启停前台保活服务；透传背景/字距/投屏屏设置 | `// [BYD]` | 保留 service 启停两处 |
 | `android/.../lyric/LyricModule.java` | 新增桥接方法 `getDisplays`/`setBackgroundStyle`/`setLetterSpacing`/`setTargetDisplay` | `// [BYD]` | 保留 4 个 `@ReactMethod` |
 | `android/app/src/main/AndroidManifest.xml` | 前台服务声明 + `FOREGROUND_SERVICE*` / `POST_NOTIFICATIONS` 权限 | `[BYD]` | 与分屏改动同文件，保留 |
-| `android/app/src/main/AndroidManifest.xml` | 开机后台起播：`RECEIVE_BOOT_COMPLETED`、`WAKE_LOCK`、`BootReceiver`（BOOT_COMPLETED / QUICKBOOT_POWERON）、`BootPlaybackService`；`UserPresentReceiver` 默认关闭，只负责关掉 0.0.9 留下的补拉 | `[BYD]` | 保留接收器、服务与权限；`BootReceiver` 的 `exported` 必须为 true。不要改回开机 `startActivity` |
+| `android/app/src/main/AndroidManifest.xml` | 开机后台启动：`RECEIVE_BOOT_COMPLETED`、`WAKE_LOCK`、`BootReceiver`（BOOT_COMPLETED / QUICKBOOT_POWERON）、`BootPlaybackService`；`UserPresentReceiver` 默认关闭，只负责关掉 0.0.9 留下的补拉 | `[BYD]` | 保留接收器、服务与权限；`BootReceiver` 的 `exported` 必须为 true。不要改回开机 `startActivity` |
 | `android/.../MainActivity.java` | 到前台时记下开机补拉已成功，并关掉亮屏补拉 | `[BYD]` | 保留 `onResume` 里的两行 |
 | `android/.../utils/UtilsModule.java` | `setBootAutostart` 把开关写入原生偏好 | `[BYD]` | 保留该 `@ReactMethod` |
 | `src/config/defaultSetting.ts` | `player.bootAutostart` 默认 `false` | `[BYD]` | 保留；默认必须是关闭 |
@@ -70,8 +70,9 @@
 | --- | --- |
 | `android/.../lyric/LyricDisplays.java` | 多屏枚举辅助类 |
 | `android/.../lyric/LyricOverlayService.java` | 桌面歌词前台保活服务 |
-| `android/.../boot/`（BootPolicy、BootPrefs、BootLaunch、BootRetryPolicy、BootStatus、BootWindow、BootReceiver、UserPresentReceiver、BootPlaybackService） | 开机后台起播。开关 `player.bootAutostart` 默认关闭。打开后 `startService` 拉播放服务并恢复上次播放，不打开主界面 |
-| `src/core/boot/background.ts` / `mode.ts` | 无界面任务：按 0s / 4s / 10s 恢复上次播放。没有播放记录时不挑歌 |
+| `android/.../boot/`（BootPolicy、BootPrefs、BootLaunch、BootRetryPolicy、BootStatus、BootWindow、BootReceiver、UserPresentReceiver、BootPlaybackService） | 开机后台启动。开关 `player.bootAutostart` 默认关闭。打开后 `startService` 拉播放服务，不打开主界面。是否出声看 `player.startupAutoPlay` |
+| `index.js` / `src/registerBootTask.ts` | 在导入 `app.ts`（导航/界面）之前注册 Headless 任务 `BootAutostart` |
+| `src/core/boot/background.ts` / `mode.ts` / `plan.ts` | 无界面任务：`startupAutoPlay` 打开时按 0s / 4s / 10s 恢复上次播放；关掉则只就绪不强制起播。没有播放记录时不挑歌 |
 | `src/screens/Home/Views/Setting/settings/Basic/IsBootAutostart.tsx` | 基本设置里的「开机自启」，并显示上次开机结果 |
 | `src/screens/Home/Views/Setting/settings/LyricDesktop/BgStyle.tsx` | 背景/边框样式（色块+圆角/边框宽滑块） |
 | `src/screens/Home/Views/Setting/settings/LyricDesktop/LetterSpacing.tsx` | 字距滑块 |
