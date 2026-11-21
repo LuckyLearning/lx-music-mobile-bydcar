@@ -56,6 +56,7 @@ public class UtilsModule extends ReactContextBaseJavaModule {
     return "UtilsModule";
   }
 
+
   @ReactMethod
   public void addListener(String eventName) {
     if (listenerCount == 0) {
@@ -370,6 +371,11 @@ public class UtilsModule extends ReactContextBaseJavaModule {
       );
       promise.resolve(result);
     }).start();
+  }
+
+  @ReactMethod(isBlockingSynchronousMethod = true)
+  public boolean isBootPlaybackRunning() {
+    return BootPlaybackService.isRunning();
   }
 
   @ReactMethod
