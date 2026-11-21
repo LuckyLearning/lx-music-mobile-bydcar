@@ -172,7 +172,14 @@ export interface NowPlayingTitles {
   title?: string
   artist?: string
   album?: string
+  /** 整段 LRC，写入 MediaMetadata */
   lyric?: string
+  /** 与 lyric 相同，写入 PlaybackState.extras，迪链 / AnyLyric L0b 读这个键 */
+  lyrics?: string
+  /** 当前句。迪链滚动歌词的第 1 行 */
+  lrc_line_1?: string
+  lrc_line_2?: string
+  lrc_line_3?: string
 }
 export const updateNowPlayingTitles = async(titles: NowPlayingTitles) => {
   // console.log('set playing titles', titles)

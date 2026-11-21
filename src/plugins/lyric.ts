@@ -67,6 +67,17 @@ export const init = async() => {
   lrcTools.init()
 }
 
+export const getLyricLines = (): Lines => lrcTools.currentLines
+
+export const getLyricText = (): string => lrcTools.lyricText
+
+export const onLyricLine = (hook: PlayHook) => {
+  lrcTools.addPlayHook(hook)
+  return () => {
+    lrcTools.removePlayHook(hook)
+  }
+}
+
 export const setLyric = (lyric: string, translation?: string, romalrc?: string) => {
   lrcTools.isPlay = false
   lrcTools.lyricText = lyric

@@ -154,7 +154,7 @@ export default memo(({ componentId }: { componentId: string }) => {
                 <PinnedTitle />
               </View>
               <View collapsable={false} style={{ flex: 1, minHeight: 0, paddingLeft: headerPad() + BACK_SIZE + headerGap(), paddingRight: headerPad() }}>
-                <Lyric onInteraction={noteInteraction} />
+                <Lyric fitViewport onInteraction={noteInteraction} />
               </View>
             </View>
             <Cover componentId={componentId} />

@@ -4,6 +4,8 @@ import { onDesktopLyricPositionChange, showDesktopLyric, onLyricLinePlay, showRe
 import playerState from '@/store/player/state'
 import settingState from '@/store/setting/state'
 import { updateNowPlayingTitles } from '@/plugins/player/utils'
+import { publishCarLyricLine } from '@/plugins/player/carLyric'
+import { onLyricLine } from '@/plugins/lyric'
 import { setLastLyric } from '@/core/player/playInfo'
 
 const updateRemoteLyric = async(lrc?: string) => {
@@ -25,6 +27,10 @@ const updateRemoteLyric = async(lrc?: string) => {
 
 export default async(setting: LX.AppSetting) => {
   await initLyricPlayer()
+  // [BYD] 每句歌词写进媒体会话，车机媒体卡片 / 仪表按 lrc_line_* 显示。与「蓝牙歌词」开关无关。
+  onLyricLine((line) => {
+    publishCarLyricLine(line)
+  })
   await Promise.all([
     setPlaybackRate(setting['player.playbackRate']),
     toggleTranslation(setting['player.isShowLyricTranslation']),
