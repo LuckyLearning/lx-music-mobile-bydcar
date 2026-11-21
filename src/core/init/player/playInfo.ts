@@ -15,7 +15,7 @@ export default async(setting: LX.AppSetting) => {
 
   await playList(info.listId, info.index)
 
-  // 开机后台起播自己会播，而且不看这个开关。这里再播一次会和重试抢同一首歌。
+  // 开机后台任务自己按 startupAutoPlay 决定是否起播。这里再播一次会和重试抢同一首歌。
   if (setting['player.startupAutoPlay'] && !isBootBackground()) setTimeout(play)
 
 
