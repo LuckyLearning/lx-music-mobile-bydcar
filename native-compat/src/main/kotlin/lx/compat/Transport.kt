@@ -86,7 +86,7 @@ class PinnedHttps(
             conn.writeFully(bytes)
             if (body != null && method != "GET") conn.writeFully(body)
             val cursor = Cursor(conn)
-            val exchange = readResponse(cursor)
+            val exchange = readResponse(cursor, method == "HEAD")
             return exchange.copy(peerIps = listOf(conn.peerIp))
         }
     }
@@ -109,7 +109,7 @@ class PinnedHttps(
         return out.toString().toByteArray(Charsets.ISO_8859_1)
     }
 
-    private fun readResponse(cursor: Cursor): Exchange {
+    private fun readResponse(cursor: Cursor, head: Boolean = false): Exchange {
         val status = cursor.line(8 * 1024)
         val match = Regex("HTTP/1\\.[01] (\\d{3})(?: (.*))?").matchEntire(status) ?: throw TransportException("status")
         val code = match.groupValues[1].toInt()
@@ -124,7 +124,7 @@ class PinnedHttps(
             val value = line.substring(colon + 1).trim()
             headers[name] = if (name in headers) headers.getValue(name) + ", " + value else value
         }
-        val skipBody = code in setOf(301, 302, 303, 307, 308)
+        val skipBody = head || code in setOf(301, 302, 303, 307, 308)
         val raw = when {
             skipBody -> ByteArray(0)
             headers["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true -> readChunked(cursor)
@@ -291,6 +291,35 @@ private fun hostMatches(pattern: String, host: String): Boolean {
     if (!pattern.startsWith("*.")) return false
     val suffix = pattern.substring(1)
     return host.length > suffix.length && host.endsWith(suffix, ignoreCase = true) && !host.dropLast(suffix.length).contains('.')
+}
+
+/**
+ * Plain HTTP only on port 80 to a public address. Callers must already have admitted that exact
+ * host through [NetworkPolicy]. Script traffic keeps [TlsConnector] and therefore stays HTTPS.
+ */
+object ScopedConnector : Connector {
+    override fun open(host: String, ip: String, port: Int, tls: Boolean, timeoutMs: Int): ByteConn {
+        if (tls) return TlsConnector.open(host, ip, port, true, timeoutMs)
+        if (port != 80) throw TransportException("cleartext port")
+        if (!Addresses.isPublic(ip)) throw TransportException("pin")
+        val tcp = Socket()
+        tcp.connect(InetSocketAddress(ip, 80), timeoutMs)
+        tcp.soTimeout = timeoutMs
+        return object : ByteConn {
+            override val peerIp = ip
+            override fun writeFully(bytes: ByteArray) {
+                tcp.outputStream.write(bytes)
+                tcp.outputStream.flush()
+            }
+            override fun read(buf: ByteArray): Int = tcp.inputStream.read(buf)
+            override fun close() {
+                try {
+                    tcp.close()
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
 }
 
 object TlsConnector : Connector {

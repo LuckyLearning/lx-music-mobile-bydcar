@@ -40,6 +40,19 @@ class BrokerService : Service() {
             return host.runPreload({ current.command(it) }, preload, script, request)
         }
 
+        override fun search(source: String, query: String): String {
+            if (query.length !in 1..80) return "{\"error\":\"query\",\"upstream\":false,\"status\":0,\"source\":null,\"tracks\":[]}"
+            val live = when (source) {
+                "kg" -> KgCatalog.live(policy, query)
+                "tx" -> TxCatalog.live(policy, query)
+                "mg" -> MgCatalog.live(policy, query)
+                "wy" -> WyCatalog.live(query)
+                "kw" -> KwSearch.live(query)
+                else -> return "{\"error\":\"source\",\"upstream\":false,\"status\":0,\"source\":null,\"tracks\":[]}"
+            }
+            return searchJson(source, live)
+        }
+
         override fun searchKg(query: String): String {
             if (query.length !in 1..80) return "{\"error\":\"query\",\"upstream\":false,\"status\":0}"
             val live = KgCatalog.live(policy, query)
@@ -62,14 +75,26 @@ class BrokerService : Service() {
             ))
         }
 
+        override fun resolveScript(script: String, requestJson: String): String {
+            if (script.length !in 1..262_144) return "{\"error\":\"script\",\"admitted\":\"rejected\"}"
+            if (script.contains("child_process") || script.contains("shutdown")) {
+                return "{\"error\":\"script-rejected\",\"admitted\":\"rejected\"}"
+            }
+            return runLoaded(script, requestJson)
+        }
+
         override fun resolveReviewed(requestJson: String): String {
+            val script = assets.open("reviewed-playback.js").bufferedReader().use { it.readText() }
+            return runLoaded(script, requestJson)
+        }
+
+        private fun runLoaded(script: String, requestJson: String): String {
             if (!ready.await(10, TimeUnit.SECONDS)) return "{\"error\":\"runtime-unavailable\"}"
             val current = runtime ?: return "{\"error\":\"runtime-unavailable\"}"
             current.setHost(object : IScriptHost.Stub() {
                 override fun handle(messageJson: String): String = host.onRpc(messageJson)
             })
             val preload = assets.open("user-api-preload.js").bufferedReader().use { it.readText() }
-            val script = assets.open("reviewed-playback.js").bufferedReader().use { it.readText() }
             val trace = host.runPreload({ current.command(it) }, preload, script, requestJson)
             val url = host.playbackUrl
             val admitted = if (url == null) "missing" else try {
@@ -105,6 +130,29 @@ class BrokerService : Service() {
                 { name -> InetAddress.getAllByName(name).mapNotNull { it.hostAddress } }
             }
         }
+    }
+
+    private fun searchJson(source: String, live: LiveSearch): String {
+        val tracks = live.page?.tracks?.take(15)?.map { track ->
+            mapOf(
+                "source" to source,
+                "name" to track.name.take(80),
+                "singer" to track.singer.take(80),
+                "songmid" to track.songmid.take(64),
+                "albumName" to track.albumName.take(80),
+                "interval" to track.interval,
+                "qualities" to track.qualities,
+                "hashes" to track.hashes,
+                "extra" to track.extra,
+            )
+        } ?: emptyList()
+        return Json.stringify(mapOf(
+            "source" to source,
+            "status" to live.status,
+            "upstream" to live.upstream,
+            "error" to live.clientError,
+            "tracks" to tracks,
+        ))
     }
 
     override fun onCreate() {

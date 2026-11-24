@@ -23,6 +23,7 @@ data class CatalogTrack(
     val qualities: List<String>,
     val hashes: Map<String, String> = emptyMap(),
     val sizes: Map<String, Long> = emptyMap(),
+    val extra: Map<String, String> = emptyMap(),
 )
 
 data class CatalogPage(val tracks: List<CatalogTrack>, val total: Int, val source: String)
@@ -98,7 +99,7 @@ object KgCatalog {
     }
 
     fun live(policy: NetworkPolicy, query: String): LiveSearch =
-        fetch(policy, searchUrl(query, 1, 10), ::parse, listOf("user-agent" to "Mozilla/5.0"))
+        fetch(policy, searchUrl(query, 1, 10), ::parse)
 
     private fun track(item: Map<*, *>): CatalogTrack {
         val qualities = ArrayList<String>()
@@ -193,7 +194,7 @@ object KwSearch {
         )
         val url = KwCatalog.searchUrl(query, 1, 5)
         return try {
-            val exchange = PinnedHttps(policy, TlsConnector).execute(policy.admit(url, "GET", emptyList(), null, 8_000, false))
+            val exchange = PinnedHttps(policy, ScopedConnector).execute(policy.admit(url, "GET", emptyList(), null, 8_000, false))
             classify(exchange.statusCode, exchange.body) { parsed ->
                 val tracks = parseBody(parsed) ?: return@classify null
                 CatalogPage(tracks.map {
@@ -207,7 +208,64 @@ object KwSearch {
 }
 
 object TxCatalog {
-    /** Parser only. The signed desktop search request is not ported. */
+    const val SEARCH_HOST = "u.y.qq.com"
+    const val USER_AGENT = "QQMusic 14090508(android 12)"
+
+    /** Same object and key order as musicSdk/tx/musicSearch.js musicSearch. */
+    fun desktopBody(query: String, page: Int, limit: Int, searchId: String): String {
+        return Json.stringify(linkedMapOf(
+            "comm" to linkedMapOf(
+                "_channelid" to "0",
+                "_os_version" to "6.2.9200-2",
+                "ct" to "19",
+                "cv" to "2151",
+                "guid" to "1F70E520B2EAA7D25E11760783C53CA9",
+                "patch" to "118",
+                "psrf_access_token_expiresAt" to 0,
+                "psrf_qqaccess_token" to "",
+                "psrf_qqopenid" to "",
+                "psrf_qqunionid" to "",
+                "tmeAppID" to "qqmusic",
+                "tmeLoginType" to 0,
+                "uin" to "0",
+                "wid" to "7223299733393904640",
+            ),
+            "music.search.SearchCgiService" to linkedMapOf(
+                "module" to "music.search.SearchCgiService",
+                "method" to "DoSearchForQQMusicDesktop",
+                "param" to linkedMapOf(
+                    "grp" to 1,
+                    "num_per_page" to limit,
+                    "page_num" to page,
+                    "query" to query,
+                    "remoteplace" to "txt.newclient.top",
+                    "search_type" to 0,
+                    "searchid" to searchId,
+                ),
+            ),
+        ))
+    }
+
+    fun parseDesktop(body: Any?): CatalogPage? {
+        val root = body as? Map<*, *> ?: return null
+        if ((root["code"] as? Number)?.toInt() != 0) return null
+        val service = (root["music.search.SearchCgiService"] as? Map<*, *>) ?: (root["req"] as? Map<*, *>) ?: return null
+        if ((service["code"] as? Number)?.toInt() != 0) return null
+        val data = service["data"] as? Map<*, *> ?: return null
+        val song = ((data["body"] as? Map<*, *>)?.get("song") as? Map<*, *>)?.get("list") as? List<*> ?: return null
+        val total = ((data["meta"] as? Map<*, *>)?.get("sum") as? Number)?.toInt() ?: song.size
+        return CatalogPage(parseSongs(song), total, "tx")
+    }
+
+    fun live(policy: NetworkPolicy, query: String): LiveSearch {
+        val body = desktopBody(query, 1, 10, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA00000").toByteArray(Charsets.UTF_8)
+        val url = "https://$SEARCH_HOST/cgi-bin/musics.fcg?sign=${LegacySign.tx(body.toString(Charsets.UTF_8))}"
+        return fetch(policy, url, ::parseDesktop, listOf(
+            "user-agent" to USER_AGENT,
+            "content-type" to "application/json",
+        ), "POST", body)
+    }
+
     fun parseSongs(rows: List<*>): List<CatalogTrack> {
         val tracks = ArrayList<CatalogTrack>()
         for (row in rows) {
@@ -237,7 +295,50 @@ object TxCatalog {
 }
 
 object WyCatalog {
-    /** Parser only. The eapi request client is not ported. */
+    const val SEARCH_HOST = "interface.music.163.com"
+    const val USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36"
+    private const val PATH = "/api/search/song/list/page"
+
+    fun queryText(query: String, page: Int, limit: Int): String {
+        return Json.stringify(linkedMapOf(
+            "keyword" to query,
+            "needCorrect" to "1",
+            "channel" to "typing",
+            "offset" to limit * (page - 1),
+            "scene" to "normal",
+            "total" to (page == 1),
+            "limit" to limit,
+        ))
+    }
+
+    fun formBody(query: String, page: Int, limit: Int): ByteArray {
+        val params = LegacySign.wyParams(PATH, queryText(query, page, limit))
+        return "params=$params".toByteArray(Charsets.US_ASCII)
+    }
+
+    fun parseBody(body: Any?): CatalogPage? {
+        val root = body as? Map<*, *> ?: return null
+        if ((root["code"] as? Number)?.toInt() != 200) return null
+        val data = root["data"] as? Map<*, *> ?: return null
+        val rows = data["resources"] as? List<*> ?: return null
+        val tracks = parseResources(rows) ?: return null
+        val total = (data["totalCount"] as? Number)?.toInt() ?: tracks.size
+        return CatalogPage(tracks, total, "wy")
+    }
+
+    fun live(query: String): LiveSearch {
+        val policy = NetworkPolicy(
+            cleartextHosts = setOf(SEARCH_HOST),
+            resolve = { host -> InetAddress.getAllByName(host).mapNotNull { it.hostAddress } },
+        )
+        val body = formBody(query, 1, 10)
+        return fetch(policy, "http://$SEARCH_HOST/eapi/batch", ::parseBody, listOf(
+            "user-agent" to USER_AGENT,
+            "origin" to "https://music.163.com",
+            "content-type" to "application/x-www-form-urlencoded",
+        ), "POST", body, ScopedConnector)
+    }
+
     fun parseResources(rows: List<*>): List<CatalogTrack>? {
         val tracks = ArrayList<CatalogTrack>()
         for (row in rows) {
@@ -270,6 +371,39 @@ object WyCatalog {
 }
 
 object MgCatalog {
+    const val SEARCH_HOST = "jadeite.migu.cn"
+    const val USER_AGENT = "Mozilla/5.0 (Linux; U; Android 11.0.0; zh-cn; MI 11 Build/OPR1.170623.032) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"
+
+    fun searchUrl(query: String, page: Int, limit: Int): String {
+        val text = LegacyRequest.encodeURIComponent(query)
+        return "https://$SEARCH_HOST/music_search/v3/search/searchAll?isCorrect=0&isCopyright=1&searchSwitch=%7B%22song%22%3A1%2C%22album%22%3A0%2C%22singer%22%3A0%2C%22tagSong%22%3A1%2C%22mvSong%22%3A0%2C%22bestShow%22%3A1%2C%22songlist%22%3A0%2C%22lyricSong%22%3A0%7D&pageSize=$limit&text=$text&pageNo=$page&sort=0&sid=USS"
+    }
+
+    fun headers(query: String, time: String): List<Pair<String, String>> {
+        val (sign, device) = LegacySign.mg(time, query)
+        return listOf(
+            "uiversion" to "A_music_3.6.1",
+            "deviceid" to device,
+            "timestamp" to time,
+            "sign" to sign,
+            "channel" to "0146921",
+            "user-agent" to USER_AGENT,
+        )
+    }
+
+    fun parseBody(body: Any?): CatalogPage? {
+        val root = body as? Map<*, *> ?: return null
+        if (root["code"]?.toString() != "000000") return null
+        val data = root["songResultData"] as? Map<*, *> ?: return null
+        val rows = data["resultList"] as? List<*> ?: return null
+        val total = data["totalCount"]?.toString()?.toIntOrNull() ?: rows.size
+        return CatalogPage(parseResultList(rows), total, "mg")
+    }
+
+    fun live(policy: NetworkPolicy, query: String, time: String = System.currentTimeMillis().toString()): LiveSearch {
+        return fetch(policy, searchUrl(query, 1, 10), ::parseBody, headers(query, time))
+    }
+
     fun parseResultList(groups: List<*>): List<CatalogTrack> {
         val tracks = ArrayList<CatalogTrack>()
         val seen = HashSet<String>()
@@ -300,6 +434,7 @@ object MgCatalog {
                         albumName = data["album"]?.toString() ?: "",
                         interval = KwCatalog.formatPlayTime(long(data["duration"]).toInt()),
                         qualities = qualities,
+                        extra = mapOf("copyrightId" to copyright),
                     )
                 )
             }
@@ -310,17 +445,89 @@ object MgCatalog {
 
 internal fun long(value: Any?): Long = (value as? Number)?.toLong() ?: 0L
 
+object KgPlaylist {
+    const val INFO_HOST = "mobiles.kugou.com"
+
+    data class Info(val name: String, val author: String, val songCount: Int)
+
+    fun infoUrl(globalId: String): String {
+        require(globalId.length in 1..80 && globalId.all { it.isLetterOrDigit() || it == '_' })
+        val params = "appid=1058&specialid=0&global_specialid=$globalId&format=jsonp&srcappid=2919&clientver=20000&clienttime=1586163242519&mid=1586163242519&uuid=1586163242519&dfid=-"
+        return "https://$INFO_HOST/api/v5/special/info_v2?$params&signature=${LegacySign.kg(params, "web")}"
+    }
+
+    /** createHttp returns body.data. specialname/nickname/songcount are the fields getUserListDetail2 reads. */
+    fun parseInfo(data: Any?): Info? {
+        val info = data as? Map<*, *> ?: return null
+        val name = info["specialname"]?.toString() ?: return null
+        if (name.isEmpty()) return null
+        return Info(
+            KwCatalog.decodeName(name),
+            KwCatalog.decodeName(info["nickname"]?.toString()),
+            (info["songcount"] as? Number)?.toInt() ?: 0,
+        )
+    }
+
+    fun parseTracks(rows: List<*>): List<CatalogTrack> {
+        val tracks = ArrayList<CatalogTrack>()
+        for (row in rows) {
+            val item = row as? Map<*, *> ?: continue
+            val qualities = ArrayList<String>()
+            val hashes = linkedMapOf<String, String>()
+            fun keep(quality: String, sizeKey: String, hashKey: String) {
+                if (long(item[sizeKey]) == 0L) return
+                qualities.add(quality)
+                val hash = item[hashKey]?.toString()?.trim().orEmpty()
+                if (hash.matches(Regex("[A-Fa-f0-9]{32}"))) hashes[quality] = hash.lowercase()
+            }
+            keep("128k", "filesize", "hash")
+            keep("320k", "filesize_320", "hash_320")
+            keep("ape", "filesize_ape", "hash_ape")
+            keep("flac", "filesize_flac", "hash_flac")
+            tracks.add(CatalogTrack(
+                source = "kg",
+                name = KwCatalog.decodeName(item["songname"]?.toString()),
+                singer = KwCatalog.decodeName(item["singername"]?.toString()),
+                songmid = CatalogText.id(item["audio_id"]),
+                albumName = KwCatalog.decodeName(item["album_name"]?.toString()),
+                interval = KwCatalog.formatPlayTime((long(item["duration"]) / 1000L).toInt()),
+                qualities = qualities,
+                hashes = hashes,
+            ))
+        }
+        return tracks
+    }
+}
+
+data class Captured(val status: Int, val body: String, val clientError: String?)
+
 private fun fetch(
     policy: NetworkPolicy,
     url: String,
     parse: (Any?) -> CatalogPage?,
     headers: List<Pair<String, String>> = emptyList(),
+    method: String = "GET",
+    body: ByteArray? = null,
+    connector: Connector = TlsConnector,
 ): LiveSearch {
+    val captured = capture(policy, url, headers, method, body, connector)
+    if (captured.clientError != null) return LiveSearch(captured.status, null, false, captured.clientError)
+    return classify(captured.status, captured.body.toByteArray(Charsets.UTF_8), parse)
+}
+
+internal fun capture(
+    policy: NetworkPolicy,
+    url: String,
+    headers: List<Pair<String, String>> = emptyList(),
+    method: String = "GET",
+    body: ByteArray? = null,
+    connector: Connector = TlsConnector,
+): Captured {
     return try {
-        val exchange = PinnedHttps(policy, TlsConnector).execute(policy.admit(url, "GET", headers, null, 8_000, false))
-        classify(exchange.statusCode, exchange.body, parse)
+        val exchange = PinnedHttps(policy, connector).execute(policy.admit(url, method, headers, body, 8_000, false))
+        Captured(exchange.statusCode, exchange.body.toString(Charsets.UTF_8), null)
     } catch (e: Exception) {
-        LiveSearch(0, null, false, e.javaClass.simpleName)
+        Captured(0, "", e.javaClass.simpleName + " " + (e.message ?: ""))
     }
 }
 

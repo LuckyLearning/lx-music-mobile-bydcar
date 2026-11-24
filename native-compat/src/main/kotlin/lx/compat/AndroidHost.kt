@@ -90,7 +90,7 @@ class AndroidHost(
         var guard = 0
         try {
         while (true) {
-            if (++guard > 8) { note("http-cascade-stop"); return }
+            if (++guard > 32) { note("http-cascade-stop"); return }
             val item = synchronized(lock) { if (queued.isEmpty()) null else queued.removeAt(0) } ?: break
             if (item.key in delivered) continue
             if (item.cancelled || item.ticket.generation < 0) {

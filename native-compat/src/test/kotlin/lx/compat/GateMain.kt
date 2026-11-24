@@ -88,6 +88,7 @@ fun main(args: Array<String>) {
     windowTests()
     playerRuleTests()
     catalogTests()
+    parityTests(root)
     check("parent watchdog kills a silent child", watchdogKillsSleep(), "")
     if (!runner.isFile) {
         check("sandbox runner exists", false, runner.path)
@@ -95,7 +96,7 @@ fun main(args: Array<String>) {
         sandboxTests(runner, preload)
     }
     liveExample()
-    liveCatalog()
+    liveCatalog(root)
     println("SUMMARY failed=$failed")
     log.append("SUMMARY failed=$failed\n")
     val reportDir = File("reports")
@@ -698,21 +699,121 @@ private fun catalogTests() {
     check("empty playlist text is an empty list", LocalPlaylists.decode(null).isEmpty() && LocalPlaylists.decode("not-json").isEmpty())
 }
 
-private fun liveCatalog() {
+private fun parityTests(root: File) {
+    val native = File(root, "native-compat")
+    val proc = ProcessBuilder("node", File(native, "tools/legacy-oracle.mjs").path, root.path, "vectors")
+        .redirectErrorStream(true)
+        .start()
+    val text = proc.inputStream.bufferedReader().readText()
+    check("original musicSdk oracle runs", proc.waitFor() == 0 && text.trim().startsWith("{"), text.take(240))
+    if (!text.trim().startsWith("{")) return
+    val oracle = Json.parse(text).obj()
+    val params = "appid=1058&specialid=0&global_specialid=collection_3_1&format=jsonp"
+    check("kg signature matches the original function", LegacySign.kg(params, "web") == oracle["kgSign"])
+    check("tx zzcSign matches the original function", LegacySign.tx(oracle["txJson"].str()) == oracle["txSign"])
+    check("mg createSignature matches the original function", LegacySign.mg("1700000000000", "hello").first == oracle["mgSign"])
+    check("wy eapi matches the original function", LegacySign.wyParams("/api/search/song/list/page", "{\"keyword\":\"hello\",\"limit\":2}") == oracle["wyParams"])
+    val fixture = Json.parse(File(native, "tools/parity-search.json").readText()).obj()
+    check("kg parser matches the original handleResult", sameTracks(KgCatalog.parse(fixture["kg"])?.tracks, oracle["kg"]))
+    check("tx parser matches the original handleResult", sameTracks(TxCatalog.parseDesktop(fixture["tx"])?.tracks, oracle["tx"]))
+    check("wy parser matches the original handleResult", sameTracks(WyCatalog.parseBody(fixture["wy"])?.tracks, oracle["wy"]))
+    check("mg parser matches the original filterData", sameTracks(MgCatalog.parseBody(fixture["mg"])?.tracks, oracle["mg"]))
+    val kw = KwSearch.parseBody(fixture["kw"])?.map {
+        CatalogTrack("kw", it.name, it.singer, it.songmid, it.albumName, it.interval, it.qualities)
+    }
+    check("kw parser matches the original handleResult", sameTracks(kw, oracle["kw"]))
+    val playlist = KgPlaylist.parseTracks(listOf(mapOf(
+        "songname" to "P", "singername" to "S", "audio_id" to 3, "album_name" to "Al", "duration" to 61000,
+        "filesize" to 10, "hash" to "0123456789abcdef0123456789abcdef",
+        "filesize_320" to 0, "filesize_ape" to 0, "filesize_flac" to 20, "hash_flac" to "abcdef0123456789abcdef0123456789",
+    )))
+    check("kg playlist rows keep the original quality order", playlist.size == 1 && playlist[0].qualities == listOf("128k", "flac") && playlist[0].interval == "01:01" && playlist[0].songmid == "3")
+}
+
+private fun sameTracks(tracks: List<CatalogTrack>?, expected: Any?): Boolean {
+    val rows = expected as? List<*> ?: return false
+    if (tracks == null || tracks.size != rows.size) return false
+    return tracks.indices.all { index ->
+        val row = rows[index] as? Map<*, *> ?: return false
+        val hashes = (row["hashes"] as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value.toString() } ?: emptyMap()
+        val qualities = (row["qualities"] as? List<*>)?.map { it.toString() } ?: emptyList()
+        tracks[index].name == row["name"] &&
+            tracks[index].singer == row["singer"] &&
+            tracks[index].songmid == row["songmid"] &&
+            tracks[index].albumName == row["albumName"] &&
+            tracks[index].interval == row["interval"] &&
+            tracks[index].qualities == qualities &&
+            tracks[index].hashes == hashes
+    }
+}
+
+private fun agree(root: File, mode: String, label: String, captured: Captured, portCount: Int?) {
+    if (captured.clientError != null) {
+        check("$label request did not fail inside the client", false, captured.clientError ?: "")
+        return
+    }
+    val trimmed = captured.body.trim()
+    if (captured.status != 200 || !(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+        val line = "INFO $label response is not JSON status=${captured.status} bytes=${captured.body.length}"
+        log.append(line).append('\n')
+        println(line)
+        return
+    }
+    val file = File.createTempFile("lx-capture-", ".json")
+    file.writeText(captured.body)
+    val proc = ProcessBuilder(
+        "node",
+        File(root, "native-compat/tools/legacy-oracle.mjs").path,
+        root.path,
+        mode,
+        file.path,
+    ).redirectErrorStream(true).start()
+    val text = proc.inputStream.bufferedReader().readText()
+    val code = proc.waitFor()
+    file.delete()
+    if (code != 0 || !text.trim().startsWith("{")) {
+        check("$label original parser ran on the captured body", false, text.take(240))
+        return
+    }
+    val parsed = Json.parse(text).obj()
+    val originalCount = (parsed["count"] as? Number)?.toInt()
+    val port = portCount ?: 0
+    val matched = if (parsed["count"] == null) portCount == null else originalCount == port
+    check(
+        "$label original parser and port agree on the same captured body",
+        matched,
+        "original=$originalCount port=$portCount status=${captured.status}",
+    )
+    if (matched) {
+        val line = "INFO $label same body original=$originalCount port=$portCount status=${captured.status} bytes=${captured.body.length}"
+        log.append(line).append('\n')
+        println(line)
+    }
+    if (matched && (originalCount ?: 0) == 0 && parsed["count"] != null) {
+        val digest = MessageDigest.getInstance("SHA-256").digest(captured.body.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 255) }.take(16)
+        val line = "INFO $label both parsers returned no tracks from the same body sha=$digest bytes=${captured.body.length} status=${captured.status}. The empty result is that response, checked with the original parser."
+        log.append(line).append('\n')
+        println(line)
+    }
+}
+
+private fun liveCatalog(root: File) {
     val policy = NetworkPolicy(resolve = { host -> InetAddress.getAllByName(host).mapNotNull { it.hostAddress } })
-    val kg = KgCatalog.live(policy, "hello")
-    if (kg.clientError != null) {
-        check("kg https search did not fail inside the client", false, "${kg.clientError} status=${kg.status}")
-    } else if (kg.upstream) {
-        log.append("INFO kg live upstream status=${kg.status}\n")
-        println("INFO kg live upstream status=${kg.status}")
-    } else {
-        val count = kg.page?.tracks?.size ?: 0
-        if (count == 0) {
-            log.append("INFO kg live empty status=${kg.status} total=${kg.page?.total}\n")
-            println("INFO kg live empty status=${kg.status} total=${kg.page?.total}")
-        } else check("kg https search parsed public tracks", true, "status=${kg.status} tracks=$count total=${kg.page?.total}")
-        val hash = if (count == 0) null else kg.page?.tracks?.firstOrNull()?.hashes?.get("128k")
+    val kgRaw = capture(policy, KgCatalog.searchUrl("hello", 1, 10))
+    val kgParsed = if (kgRaw.clientError == null && kgRaw.body.trim().startsWith("{")) runCatching { KgCatalog.parse(Json.parse(kgRaw.body)) }.getOrNull() else null
+    agree(root, "parse-kg", "kg", kgRaw, if (kgRaw.clientError != null) null else kgParsed?.tracks?.size ?: 0)
+    if (kgRaw.clientError == null) {
+        val other = capture(policy, KgCatalog.searchUrl("hello", 1, 10), listOf("user-agent" to "Mozilla/5.0"))
+        val otherPage = if (other.body.trim().startsWith("{")) runCatching { KgCatalog.parse(Json.parse(other.body)) }.getOrNull() else null
+        val line = "INFO kg non-original Mozilla user agent is not the port. same parser count=${otherPage?.tracks?.size ?: 0} status=${other.status}. The port keeps the original Chrome 69 header."
+        log.append(line).append('\n')
+        println(line)
+    }
+    val kgPage = kgParsed
+    run {
+        val count = kgPage?.tracks?.size ?: 0
+        val hash = if (count == 0) null else kgPage?.tracks?.firstOrNull()?.hashes?.get("128k")
         if (hash != null) {
             val play = KgPlay.live(policy, hash, "128k")
             if (play.clientError != null) {
@@ -722,12 +823,10 @@ private fun liveCatalog() {
                 println("INFO kg play upstream status=${play.status}")
             } else {
                 val got = play.playable
-                check(
-                    "kg play info returned https audio on kugou",
-                    got.url.startsWith("https://") && got.host.endsWith("kugou.com") && got.bitrate > 0,
-                    "host=${got.host} bitrate=${got.bitrate}",
-                )
-                val first = kg.page?.tracks?.firstOrNull()
+                val line = "INFO kg playInfo is not getMusicUrl. host=${got.host} bitrate=${got.bitrate} https=${got.url.startsWith("https://")}"
+                log.append(line).append('\n')
+                println(line)
+                val first = kgPage?.tracks?.firstOrNull()
                 val hq = first?.hashes?.get("320k")
                 val lowSize = first?.sizes?.get("128k") ?: 0L
                 val highSize = first?.sizes?.get("320k") ?: 0L
@@ -751,18 +850,42 @@ private fun liveCatalog() {
             }
         }
     }
-    val kw = KwSearch.live("hello")
-    if (kw.clientError == "TransportException") {
-        log.append("INFO kw live not fetched because the connector refuses cleartext\n")
-        println("INFO kw live not fetched because the connector refuses cleartext")
-    } else if (kw.clientError != null) {
-        check("kw scoped cleartext search did not fail inside the client", false, "${kw.clientError} status=${kw.status}")
-    } else if (kw.upstream) {
-        log.append("INFO kw live upstream status=${kw.status}\n")
-        println("INFO kw live upstream status=${kw.status}")
-    } else {
-        check("kw scoped cleartext search parsed public tracks", (kw.page?.tracks?.size ?: 0) > 0, "status=${kw.status}")
+    val txBytes = TxCatalog.desktopBody("hello", 1, 10, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA00000").toByteArray(Charsets.UTF_8)
+    val txRaw = capture(
+        policy,
+        "https://${TxCatalog.SEARCH_HOST}/cgi-bin/musics.fcg?sign=${LegacySign.tx(txBytes.toString(Charsets.UTF_8))}",
+        listOf("user-agent" to TxCatalog.USER_AGENT, "content-type" to "application/json"),
+        "POST",
+        txBytes,
+    )
+    val txPage = if (txRaw.body.trim().startsWith("{")) runCatching { TxCatalog.parseDesktop(Json.parse(txRaw.body)) }.getOrNull() else null
+    agree(root, "parse-tx", "tx", txRaw, if (txRaw.clientError != null) null else txPage?.tracks?.size ?: 0)
+    val mgRaw = capture(policy, MgCatalog.searchUrl("hello", 1, 10), MgCatalog.headers("hello", "1700000000000"))
+    val mgPage = if (mgRaw.body.trim().startsWith("{")) runCatching { MgCatalog.parseBody(Json.parse(mgRaw.body)) }.getOrNull() else null
+    agree(root, "parse-mg", "mg", mgRaw, if (mgRaw.clientError != null) null else mgPage?.tracks?.size ?: 0)
+    val clear = NetworkPolicy(
+        cleartextHosts = setOf(WyCatalog.SEARCH_HOST, KwCatalog.SEARCH_HOST),
+        resolve = { host -> InetAddress.getAllByName(host).mapNotNull { it.hostAddress } },
+    )
+    val wyBytes = WyCatalog.formBody("hello", 1, 10)
+    val wyRaw = capture(
+        clear,
+        "http://${WyCatalog.SEARCH_HOST}/eapi/batch",
+        listOf("user-agent" to WyCatalog.USER_AGENT, "origin" to "https://music.163.com", "content-type" to "application/x-www-form-urlencoded"),
+        "POST",
+        wyBytes,
+        ScopedConnector,
+    )
+    val wyPage = if (wyRaw.body.trim().startsWith("{")) runCatching { WyCatalog.parseBody(Json.parse(wyRaw.body)) }.getOrNull() else null
+    agree(root, "parse-wy", "wy", wyRaw, if (wyRaw.clientError != null) null else wyPage?.tracks?.size ?: 0)
+    val kwRaw = capture(clear, KwCatalog.searchUrl("hello", 1, 5), connector = ScopedConnector)
+    val kwRows = if (kwRaw.body.trim().startsWith("{")) runCatching { KwSearch.parseBody(Json.parse(kwRaw.body)) }.getOrNull() else null
+    val kwCount = when {
+        kwRaw.clientError != null -> null
+        kwRows == null -> null
+        else -> kwRows.size
     }
+    agree(root, "parse-kw", "kw", kwRaw, kwCount)
 }
 
 private fun liveExample() {

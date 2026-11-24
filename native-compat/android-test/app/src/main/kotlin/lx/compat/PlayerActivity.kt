@@ -48,6 +48,8 @@ class PlayerActivity : Activity() {
     private var lyricCues: List<LyricCue.Line> = emptyList()
     private var searchHits: List<Map<String, Any?>> = emptyList()
     private var searchQuality = "128k"
+    private var searchSource = "tx"
+    private var sourceButton: Button? = null
     private var floating: FloatingLyric? = null
     private var holdOverlay = false
 
@@ -201,7 +203,8 @@ class PlayerActivity : Activity() {
             button("打开歌单") { openSavedPlaylist() },
             button("打开音频") { openAudio() },
             button("测试音") { addTone() },
-            button("酷狗搜索") { searchKg() },
+            button("搜索") { searchOnline() }.also { sourceButton = it },
+            button("换平台") { cycleSource() },
             button("播放搜索") { playSearch() },
             button("换音质") { cycleSearchQuality() },
             button("播放样本") { playReviewedSample() },
@@ -266,7 +269,7 @@ class PlayerActivity : Activity() {
         bindStep(smaller, -1)
         bindStep(larger, 1)
         panel.addView(row(smaller, larger))
-        panel.addView(text("酷狗搜索和播放地址都走 HTTPS。换音质会改用对应哈希再请求；上游返回的码率以结果为准。QQ、网易签名请求还没迁。", 13f))
+        panel.addView(text("搜索按原版各平台的请求走。播放地址只交给已导入的音源脚本，脚本没返回地址就不会换成别的接口。", 13f))
         return panel
     }
 
@@ -653,18 +656,35 @@ class PlayerActivity : Activity() {
         else renderProgress()
     }
 
-    private fun searchKg() {
+    private fun cycleSource() {
+        val order = listOf("tx", "wy", "mg", "kg", "kw")
+        searchSource = order[(order.indexOf(searchSource) + 1).mod(order.size)]
+        sourceButton?.text = "搜索 " + sourceLabel(searchSource)
+        queue.text = "当前搜索平台是 " + sourceLabel(searchSource)
+    }
+
+    private fun sourceLabel(source: String): String = when (source) {
+        "tx" -> "QQ"
+        "wy" -> "网易"
+        "mg" -> "咪咕"
+        "kg" -> "酷狗"
+        "kw" -> "酷我"
+        else -> source
+    }
+
+    private fun searchOnline() {
         val query = filter.text?.toString()?.trim().orEmpty()
         if (query.isEmpty()) {
             queue.text = "先在筛选框里写下要搜的词。这也会筛选本机队列。"
             return
         }
-        queue.text = "正在搜索酷狗"
+        val source = searchSource
+        queue.text = "正在按原版请求搜索 " + sourceLabel(source)
         Thread {
             val json = try {
-                ensureBroker().searchKg(query)
+                ensureBroker().search(source, query)
             } catch (_: Exception) {
-                "{\"error\":\"broker\"}"
+                "{\"error\":\"broker\",\"source\":\"$source\"}"
             }
             handler.post { showSearch(json) }
         }.start()
@@ -681,21 +701,22 @@ class PlayerActivity : Activity() {
             queue.text = "搜索没有完成"
             return
         }
+        val source = root["source"].strOrNull() ?: searchSource
         if (root["upstream"] == true) {
-            queue.text = "酷狗搜索没有返回可用结果，状态 " + root["status"] + "。这是上游结果，不是兼容通过。"
+            queue.text = sourceLabel(source) + " 没有返回可解析的结果，状态 " + root["status"] + "。这是这次响应，不是兼容通过。"
             return
         }
         val rows = root["tracks"]?.list() ?: emptyList()
         searchHits = rows.mapNotNull { it?.obj() }
         if (searchHits.isEmpty()) {
-            queue.text = "酷狗没有解析出曲目"
+            queue.text = sourceLabel(source) + " 这次响应里没有曲目。原版解析和这里看到的是同一份响应时，才记成上游结果。"
             return
         }
         searchQuality = "128k"
         queue.text = searchHits.mapIndexed { index, item ->
             val qualities = (item["qualities"]?.list() ?: emptyList()).mapNotNull { it as? String }
             (index + 1).toString() + ". " + item["name"].strOrNull().orEmpty() + " — " + item["singer"].strOrNull().orEmpty() + "  " + qualities.joinToString("/")
-        }.joinToString("\n") + "\n点「播放搜索」会向酷狗要第一条的 HTTPS 地址。当前音质 " + searchQuality + "。"
+        }.joinToString("\n") + "\n点「播放搜索」把第一条交给已导入的音源脚本。当前音质 " + searchQuality + "。"
     }
 
     private fun cycleSearchQuality() {
@@ -718,25 +739,38 @@ class PlayerActivity : Activity() {
             return
         }
         val hashes = hit["hashes"]?.obj() ?: emptyMap()
-        val hash = hashes[searchQuality].strOrNull() ?: hashes.values.firstOrNull().strOrNull()
-        if (hash.isNullOrEmpty()) {
+        val hash = hashes[searchQuality].strOrNull() ?: hashes.values.firstOrNull().strOrNull() ?: ""
+        if (searchSource == "kg" && hash.isEmpty()) {
             queue.text = "这条没有可用的音质哈希"
             return
         }
-        val requested = if (hashes[searchQuality] is String) searchQuality else "128k"
+        val requested = if (searchSource != "kg" || hashes[searchQuality] is String) searchQuality else "128k"
+        val extra = hit["extra"]?.obj() ?: emptyMap()
         val musicInfo = mapOf(
-            "source" to "kg",
+            "source" to searchSource,
             "name" to (hit["name"].strOrNull() ?: ""),
             "singer" to (hit["singer"].strOrNull() ?: ""),
             "songmid" to (hit["songmid"].strOrNull() ?: ""),
             "hash" to hash,
+            "copyrightId" to (extra["copyrightId"].strOrNull() ?: ""),
             "albumName" to (hit["albumName"].strOrNull() ?: ""),
             "interval" to (hit["interval"].strOrNull() ?: ""),
         )
+        val scriptFile = java.io.File(filesDir, "user-script.js")
+        if (!scriptFile.isFile) {
+            queue.text = "还没有导入音源脚本。播放地址不会改走别的接口。"
+            return
+        }
+        val script = try {
+            scriptFile.readText()
+        } catch (_: Exception) {
+            queue.text = "音源脚本没有读出来"
+            return
+        }
         queue.text = "按原版把 " + requested + " 交给音源脚本"
         Thread {
             val json = try {
-                ensureBroker().resolveReviewed(LegacyMusicUrl.requestJson("kg", requested, musicInfo))
+                ensureBroker().resolveScript(script, LegacyMusicUrl.requestJson(searchSource, requested, musicInfo))
             } catch (_: Exception) {
                 "{\"admitted\":\"rejected\"}"
             }

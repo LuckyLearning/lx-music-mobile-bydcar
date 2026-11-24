@@ -33,6 +33,9 @@ keystore.properties
 *.hprof
 .cxx/
 
+# Reviewed third-party scripts are executed from the test run and are not vendored.
+native-compat/android-test/app/src/androidTest/assets/user-script.js
+
 # node.js
 #
 node_modules/

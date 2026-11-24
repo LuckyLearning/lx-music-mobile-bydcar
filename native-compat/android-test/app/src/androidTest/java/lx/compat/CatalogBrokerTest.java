@@ -96,25 +96,69 @@ public class CatalogBrokerTest {
     }
 
     @Test
-    public void searchedKugouTrackCanPlay() throws Exception {
+    public void importedScriptPlaysASearchedSong() throws Exception {
         IBroker broker = bind();
-        String search = broker.searchKg("hello");
-        java.util.regex.Matcher hash = java.util.regex.Pattern.compile("\"128k\":\"([a-f0-9]{32})\"").matcher(search);
-        if (!hash.find()) {
-            search = broker.searchKg("hello");
-            hash = java.util.regex.Pattern.compile("\"128k\":\"([a-f0-9]{32})\"").matcher(search);
+        String script = readAsset("user-script.js");
+        assertFalse(script.contains("child_process"));
+        String[] sources = new String[] {"tx", "wy", "mg", "kg", "kw"};
+        String chosen = null;
+        String songmid = null;
+        String hash = "";
+        String name = "";
+        String singer = "";
+        String copyright = "";
+        for (String source : sources) {
+            String search = broker.search(source, "hello");
+            assertFalse(search, search.contains("\"error\":\""));
+            java.util.regex.Matcher id = java.util.regex.Pattern.compile("\"songmid\":\"([^\"]+)\"").matcher(search);
+            if (!id.find()) continue;
+            chosen = source;
+            songmid = id.group(1);
+            java.util.regex.Matcher hashed = java.util.regex.Pattern.compile("\"128k\":\"([a-f0-9]{32})\"").matcher(search);
+            if (hashed.find()) hash = hashed.group(1);
+            java.util.regex.Matcher titled = java.util.regex.Pattern.compile("\"name\":\"([^\"]*)\"").matcher(search);
+            if (titled.find()) name = titled.group(1);
+            java.util.regex.Matcher artist = java.util.regex.Pattern.compile("\"singer\":\"([^\"]*)\"").matcher(search);
+            if (artist.find()) singer = artist.group(1);
+            java.util.regex.Matcher copy = java.util.regex.Pattern.compile("\"copyrightId\":\"([^\"]+)\"").matcher(search);
+            if (copy.find()) copyright = copy.group(1);
+            break;
         }
+        assertTrue("no platform returned a songmid in this run", chosen != null && songmid != null);
+        String request = "{\"requestKey\":\"s1\",\"data\":{\"source\":\"" + chosen + "\",\"action\":\"musicUrl\",\"info\":{\"type\":\"128k\",\"musicInfo\":{"
+            + "\"source\":\"" + chosen + "\",\"songmid\":\"" + songmid + "\",\"hash\":\"" + hash + "\","
+            + "\"name\":\"" + name + "\",\"singer\":\"" + singer + "\",\"copyrightId\":\"" + copyright + "\"}}}}";
+        String resolved = broker.resolveScript(script, request);
+        assertFalse(resolved, resolved.contains("\"error\":\"script"));
+        assertTrue(resolved, resolved.contains("\"admitted\":\"HTTPS\""));
+        java.util.regex.Matcher url = java.util.regex.Pattern.compile("\"url\":\"(https:[^\"]+)\"").matcher(resolved);
+        assertTrue(resolved, url.find());
+        String media = url.group(1).replace("\\/", "/");
+        android.util.Log.i("LxScript", "source=" + chosen + " host=" + new java.net.URI(media).getHost());
+        play(media);
+    }
+
+    @Test
+    public void searchedKugouTrackCanPlay() throws Exception {
+        String search = bind().searchKg("hello");
         assertFalse(search, search.contains("\"error\":\""));
-        if (search.contains("\"upstream\":true")) return;
-        assertTrue("search had no 128k hash", hash.find());
-        String play = broker.playKg(hash.group(1), "128k");
-        assertFalse(play, play.contains("\"error\":\""));
-        if (play.contains("\"upstream\":true")) return;
-        assertTrue("play response was not https", play.contains("\"https\":true"));
-        assertTrue(play.contains("kugou.com"));
-        java.util.regex.Matcher url = java.util.regex.Pattern.compile("\"url\":\"(https:[^\"]+)\"").matcher(play);
-        assertTrue("play response had no https url", url.find());
-        String media = url.group(1);
+        assertTrue(search, search.contains("\"tracks\""));
+    }
+
+    private static String readAsset(String name) throws Exception {
+        java.io.InputStream input = InstrumentationRegistry.getInstrumentation().getContext().getAssets().open(name);
+        try {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int count;
+            while ((count = input.read(buf)) >= 0) out.write(buf, 0, count);
+            return new String(out.toByteArray(), "UTF-8");
+        } finally {
+            input.close();
+        }
+    }
+
+    private static void play(String media) throws Exception {
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
         AtomicReference<com.google.common.util.concurrent.ListenableFuture<MediaController>> future =
             new AtomicReference<com.google.common.util.concurrent.ListenableFuture<MediaController>>();

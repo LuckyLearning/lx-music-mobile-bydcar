@@ -139,7 +139,18 @@ PASS lyric cue advances at the next stamp
 PASS local playlist roundtrip keeps the title and url
 PASS musicUrl request matches the original user-api shape
 PASS empty playlist text is an empty list
-INFO watchdog exit=137 elapsedMs=416
+PASS original musicSdk oracle runs
+PASS kg signature matches the original function
+PASS tx zzcSign matches the original function
+PASS mg createSignature matches the original function
+PASS wy eapi matches the original function
+PASS kg parser matches the original handleResult
+PASS tx parser matches the original handleResult
+PASS wy parser matches the original handleResult
+PASS mg parser matches the original filterData
+PASS kw parser matches the original handleResult
+PASS kg playlist rows keep the original quality order
+INFO watchdog exit=137 elapsedMs=404
 PASS parent watchdog kills a silent child
 PASS runner stays up before setup
 PASS lx version env and script info
@@ -180,6 +191,16 @@ PASS memory limit exits 70
 PASS child watchdog exits 72 while the parent is silent
 PASS live https://example.com returns a public address and the example page
 PASS live redirect to example.com is followed
-INFO kg live empty status=200 total=0
-INFO kw live not fetched because the connector refuses cleartext
+PASS kg original parser and port agree on the same captured body
+INFO kg same body original=10 port=10 status=200 bytes=41405
+INFO kg non-original Mozilla user agent is not the port. same parser count=10 status=200. The port keeps the original Chrome 69 header.
+INFO kg play upstream status=200
+PASS tx original parser and port agree on the same captured body
+INFO tx same body original=10 port=10 status=200 bytes=53363
+PASS mg original parser and port agree on the same captured body
+INFO mg same body original=13 port=13 status=200 bytes=20842
+PASS wy original parser and port agree on the same captured body
+INFO wy same body original=10 port=10 status=200 bytes=34133
+PASS kw original parser and port agree on the same captured body
+INFO kw same body original=5 port=5 status=200 bytes=20132
 SUMMARY failed=0

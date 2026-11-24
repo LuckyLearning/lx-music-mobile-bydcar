@@ -1,0 +1,118 @@
+{
+  "kg": {
+    "error_code": 0,
+    "data": {
+      "total": 2,
+      "lists": [
+        {
+          "Audioid": 7,
+          "FileHash": "0123456789ABCDEF0123456789ABCDEF",
+          "FileSize": 128000,
+          "HQFileHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "HQFileSize": 320000,
+          "SQFileSize": 0,
+          "ResFileSize": 0,
+          "OriSongName": "Song &amp; Name",
+          "Suffix": "Live",
+          "Singers": [{ "name": "A" }, { "name": "B" }],
+          "AlbumName": "Al",
+          "Duration": 125,
+          "Grp": [
+            {
+              "Audioid": 8,
+              "FileHash": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+              "FileSize": 1000,
+              "HQFileSize": 0,
+              "SQFileSize": 0,
+              "ResFileSize": 0,
+              "OriSongName": "Child",
+              "Singers": [],
+              "AlbumName": "",
+              "Duration": 1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "tx": {
+    "code": 0,
+    "music.search.SearchCgiService": {
+      "code": 0,
+      "data": {
+        "meta": { "sum": 1 },
+        "body": {
+          "song": {
+            "list": [
+              {
+                "title": "T",
+                "mid": "m1",
+                "id": 9,
+                "interval": 90,
+                "singer": [{ "name": "Q" }],
+                "album": { "name": "QA", "mid": "am" },
+                "file": { "media_mid": "f1", "size_128mp3": 10, "size_320mp3": 0, "size_flac": 20, "size_hires": 0 }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "wy": {
+    "code": 200,
+    "data": {
+      "totalCount": 1,
+      "resources": [
+        {
+          "baseInfo": {
+            "simpleSongData": {
+              "name": "W",
+              "id": 42,
+              "dt": 180000,
+              "privilege": { "maxbr": 320000, "maxBrLevel": "hires" },
+              "ar": [{ "name": "WY" }],
+              "al": { "name": "WA", "id": 3 },
+              "h": { "size": 1000 },
+              "l": { "size": 400 }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "mg": {
+    "code": "000000",
+    "songResultData": {
+      "totalCount": "1",
+      "resultList": [
+        [
+          {
+            "songId": "s",
+            "copyrightId": "c",
+            "name": "M",
+            "album": "MA",
+            "albumId": "aid",
+            "duration": 40,
+            "singerList": [{ "name": "MG" }],
+            "audioFormats": [{ "formatType": "PQ", "asize": 10 }, { "formatType": "ZQ24", "isize": 20 }]
+          }
+        ]
+      ]
+    }
+  },
+  "kw": {
+    "TOTAL": "1",
+    "SHOW": "1",
+    "abslist": [
+      {
+        "MUSICRID": "MUSIC_9",
+        "N_MINFO": "level:h,bitrate:128,format:mp3,size:1.0M;level:s,bitrate:320,format:mp3,size:3.0M",
+        "SONGNAME": "N",
+        "ARTIST": "S&T",
+        "ALBUM": "A",
+        "DURATION": "61"
+      }
+    ]
+  }
+}
