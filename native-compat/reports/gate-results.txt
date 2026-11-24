@@ -176,8 +176,10 @@ PASS infinite loop exits 70
 PASS memory limit exits 70
 PASS child watchdog exits 72 while the parent is silent
 PASS live https://example.com returns a public address and the example page
+PASS live redirect to example.com is followed
 PASS kg https search parsed public tracks
 PASS kg play info returned https audio on kugou
-INFO kg hq hash bitrate=128 status=200
+PASS kg search lists a larger 320k file than 128k
+INFO kg 320 hash did not change the file bitrate=128 size=3033347 status=200
 INFO kw live not fetched because the connector refuses cleartext
 SUMMARY failed=0

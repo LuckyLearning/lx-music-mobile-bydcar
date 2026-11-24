@@ -533,6 +533,7 @@ class PlayerActivity : Activity() {
         current.seekTo(current.mediaItemCount - 1, 0)
         current.prepare()
         current.play()
+        showLyric("[00:00.00]测试音开始\n[00:00.20]测试音后半")
     }
 
     private fun item(id: String, title: String, uri: Uri): MediaItem {
@@ -679,7 +680,9 @@ class PlayerActivity : Activity() {
         current.seekTo(current.mediaItemCount - 1, 0)
         current.prepare()
         current.play()
-        queue.text = "已加入队列。请求 " + requested + "，上游返回 " + bitrate + "kbps。主机 " + host + "。"
+        val sameFile = requested != "128k" && bitrate in 1..128
+        queue.text = "已加入队列。请求 " + requested + "，上游返回 " + bitrate + "kbps。主机 " + host + "。" +
+            if (sameFile) "更高音质的直链返回了验证要求，没有绕过，所以文件仍是这段音频。" else ""
     }
 
     private fun playReviewedSample() {

@@ -717,12 +717,26 @@ private fun liveCatalog() {
                     got.url.startsWith("https://") && got.host.endsWith("kugou.com") && got.bitrate > 0,
                     "host=${got.host} bitrate=${got.bitrate}",
                 )
-                val hq = kg.page?.tracks?.firstOrNull()?.hashes?.get("320k")
+                val first = kg.page?.tracks?.firstOrNull()
+                val hq = first?.hashes?.get("320k")
+                val lowSize = first?.sizes?.get("128k") ?: 0L
+                val highSize = first?.sizes?.get("320k") ?: 0L
+                if (hq != null && lowSize > 0L && highSize > 0L) {
+                    check("kg search lists a larger 320k file than 128k", hq != hash && highSize > lowSize, "low=$lowSize high=$highSize")
+                }
                 if (hq != null && hq != hash) {
                     val higher = KgPlay.live(policy, hq, "320k")
-                    val rate = higher.playable?.bitrate
-                    log.append("INFO kg hq hash bitrate=$rate status=${higher.status}\n")
-                    println("INFO kg hq hash bitrate=$rate status=${higher.status}")
+                    val lowPlay = got
+                    val highPlay = higher.playable
+                    val changed = highPlay != null && (highPlay.bitrate > lowPlay.bitrate || highPlay.fileSize > lowPlay.fileSize || highPlay.url != lowPlay.url)
+                    if (higher.clientError != null) {
+                        check("kg 320 request did not fail inside the client", false, higher.clientError)
+                    } else if (!changed) {
+                        log.append("INFO kg 320 hash did not change the file bitrate=${highPlay?.bitrate} size=${highPlay?.fileSize} status=${higher.status}\n")
+                        println("INFO kg 320 hash did not change the file bitrate=${highPlay?.bitrate} size=${highPlay?.fileSize} status=${higher.status}")
+                    } else {
+                        check("kg quality switch changed the audio", true, "bitrate=${highPlay?.bitrate} size=${highPlay?.fileSize}")
+                    }
                 }
             }
         }
@@ -749,6 +763,13 @@ private fun liveExample() {
         val text = exchange.body.toString(Charsets.UTF_8)
         val public = exchange.peerIps.all { Addresses.isPublic(it) }
         check("live https://example.com returns a public address and the example page", exchange.statusCode == 200 && text.contains("Example Domain") && public, "status=${exchange.statusCode} ips=${exchange.peerIps}")
+        val redirected = client.execute(policy.admit("https://httpbin.org/redirect-to?url=https%3A%2F%2Fexample.com%2F", "GET", listOf("user-agent" to "Mozilla/5.0"), null, 8_000, false))
+        val redirectedText = redirected.body.toString(Charsets.UTF_8)
+        check(
+            "live redirect to example.com is followed",
+            redirected.statusCode == 200 && redirectedText.contains("Example Domain") && redirected.peerIps.all { Addresses.isPublic(it) },
+            "status=${redirected.statusCode}",
+        )
     } catch (e: Exception) {
         check("live https://example.com returns a public address and the example page", false, e.javaClass.simpleName + " " + (e.message ?: ""))
     }

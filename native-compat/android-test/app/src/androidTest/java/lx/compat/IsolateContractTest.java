@@ -49,7 +49,7 @@ public class IsolateContractTest {
             + "var hex=lx.utils.buffer.bufToString(out,'hex');"
             + "var rsaok=hex==='5a15528426dce4a9e7e904fadd9584f603492ddb3b9039b1676be74f1837b1763ad8adb6f09aa815c44bf864bda1a016b5c9802fd4f153e4cb86d343d7789d0d';"
             + "var redirectOk=false;"
-            + "lx.request('https://httpbingo.org/redirect-to?url=https%3A%2F%2Fexample.com%2F',{timeout:8000},function(err,resp){"
+            + "lx.request('https://httpbin.org/redirect-to?url=https%3A%2F%2Fexample.com%2F',{timeout:8000},function(err,resp){"
             + "redirectOk=!err && resp && resp.statusCode==200 && String(resp.body).indexOf('Example Domain')>=0;"
             + "});"
             + "lx.on('request', function(){ if(!rsaok || !redirectOk) return Promise.reject(new Error('probe'));"
@@ -60,7 +60,7 @@ public class IsolateContractTest {
         String trace = bind().runScript(script, request);
         assertTrue(trace, trace.contains("alert rsa=ok"));
         if (trace.contains("http-failed")) return;
-        assertTrue(trace, trace.contains("http host=httpbingo.org"));
+        assertTrue(trace, trace.contains("http host=httpbin.org"));
         assertTrue(trace, trace.contains("script-response status=true"));
     }
 

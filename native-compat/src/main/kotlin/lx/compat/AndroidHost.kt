@@ -122,7 +122,7 @@ class AndroidHost(
             val exchange = try {
                 transport(admission)
             } catch (e: Exception) {
-                note("http-failed host=${admission.host} type=${e.javaClass.simpleName}")
+                note("http-failed host=${admission.host} type=${e.javaClass.simpleName} detail=${e.message?.take(80) ?: ""}")
                 deliver(send, item.key, "request failed", null)
                 continue
             }

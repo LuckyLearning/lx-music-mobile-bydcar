@@ -22,6 +22,7 @@ data class CatalogTrack(
     val interval: String,
     val qualities: List<String>,
     val hashes: Map<String, String> = emptyMap(),
+    val sizes: Map<String, Long> = emptyMap(),
 )
 
 data class CatalogPage(val tracks: List<CatalogTrack>, val total: Int, val source: String)
@@ -102,9 +103,12 @@ object KgCatalog {
     private fun track(item: Map<*, *>): CatalogTrack {
         val qualities = ArrayList<String>()
         val hashes = linkedMapOf<String, String>()
+        val sizes = linkedMapOf<String, Long>()
         fun keep(quality: String, sizeKey: String, hashKey: String) {
-            if (long(item[sizeKey]) == 0L) return
+            val size = long(item[sizeKey])
+            if (size == 0L) return
             qualities.add(quality)
+            sizes[quality] = size
             val hash = item[hashKey]?.toString()?.trim().orEmpty()
             if (hash.matches(Regex("[A-Fa-f0-9]{32}"))) hashes[quality] = hash.lowercase()
         }
@@ -123,6 +127,7 @@ object KgCatalog {
             interval = KwCatalog.formatPlayTime(long(item["Duration"]).toInt()),
             qualities = qualities,
             hashes = hashes,
+            sizes = sizes,
         )
     }
 }
@@ -131,7 +136,7 @@ object KgCatalog {
 object KgPlay {
     const val INFO_HOST = "m.kugou.com"
 
-    data class Playable(val url: String, val host: String, val bitrate: Int, val quality: String)
+    data class Playable(val url: String, val host: String, val bitrate: Int, val fileSize: Long, val quality: String)
 
     fun infoUrl(hash: String): String {
         require(hash.matches(Regex("[A-Fa-f0-9]{32}")))
@@ -150,7 +155,7 @@ object KgPlay {
         } ?: return null
         if (!host.endsWith(".kugou.com") && host != "kugou.com") return null
         if (Addresses.parse(host) != null && !Addresses.isPublic(host)) return null
-        return Playable(url, host, (root["bitRate"] as? Number)?.toInt() ?: 0, quality)
+        return Playable(url, host, (root["bitRate"] as? Number)?.toInt() ?: 0, long(root["fileSize"]), quality)
     }
 
     fun live(policy: NetworkPolicy, hash: String, quality: String): LivePlay {
