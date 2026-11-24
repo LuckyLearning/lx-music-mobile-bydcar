@@ -686,6 +686,9 @@ private fun catalogTests() {
     check("lyric cue parses minutes and fractions", lines.size == 2 && lines[0].timeMs == 1500L && lines[1].timeMs == 3000L)
     check("lyric cue stays on the earlier line", LyricCue.current(lines, 2000)?.text == "one")
     check("lyric cue advances at the next stamp", LyricCue.current(lines, 3000)?.text == "two")
+    val stored = LocalPlaylists.decode(LocalPlaylists.encode(listOf(SavedList("晚", listOf(SavedTrack("歌", "https://example.com/a.mp3"))))))
+    check("local playlist roundtrip keeps the title and url", stored.size == 1 && stored[0].name == "晚" && stored[0].tracks[0].uri == "https://example.com/a.mp3")
+    check("empty playlist text is an empty list", LocalPlaylists.decode(null).isEmpty() && LocalPlaylists.decode("not-json").isEmpty())
 }
 
 private fun liveCatalog() {

@@ -182,6 +182,9 @@ class PlayerActivity : Activity() {
             button("下一首") { controller?.seekToNextMediaItem() },
             button("顺序") { cycleMode() }.also { modeButton = it },
             button("收藏") { toggleFavorite() }.also { favoriteButton = it },
+            button("歌单") { showPlaylists() },
+            button("保存歌单") { savePlaylist() },
+            button("打开歌单") { openSavedPlaylist() },
             button("打开音频") { openAudio() },
             button("测试音") { addTone() },
             button("酷狗搜索") { searchKg() },
@@ -478,6 +481,54 @@ class PlayerActivity : Activity() {
         if (!values.add(id)) values.remove(id)
         ClientPrefs.prefs(this).edit().putString(ClientPrefs.FAVORITES, Json.stringify(values.toList())).apply()
         render()
+    }
+
+    private fun savePlaylist() {
+        val current = controller
+        if (current == null || current.mediaItemCount == 0) {
+            queue.text = "队列是空的，没有可保存的歌单"
+            return
+        }
+        val tracks = (0 until current.mediaItemCount).map { index ->
+            val item = current.getMediaItemAt(index)
+            SavedTrack(
+                item.mediaMetadata.title?.toString()?.ifEmpty { null } ?: item.mediaId,
+                item.localConfiguration?.uri?.toString() ?: "",
+            )
+        }.filter { it.uri.isNotEmpty() }
+        val lists = LocalPlaylists.decode(ClientPrefs.prefs(this).getString(ClientPrefs.PLAYLISTS, null)).toMutableList()
+        lists.add(0, SavedList("队列 " + lists.size, tracks))
+        ClientPrefs.prefs(this).edit().putString(ClientPrefs.PLAYLISTS, LocalPlaylists.encode(lists)).apply()
+        showPlaylists()
+    }
+
+    private fun openSavedPlaylist() {
+        val current = controller
+        val list = LocalPlaylists.decode(ClientPrefs.prefs(this).getString(ClientPrefs.PLAYLISTS, null)).firstOrNull()
+        if (current == null || list == null || list.tracks.isEmpty()) {
+            queue.text = "没有已保存的歌单"
+            return
+        }
+        current.clearMediaItems()
+        list.tracks.forEach { track ->
+            current.addMediaItem(item(track.uri, track.title, Uri.parse(track.uri)))
+        }
+        current.prepare()
+        queue.text = "已打开「" + list.name + "」，没有自动播放"
+    }
+
+    private fun showPlaylists() {
+        val favorites = favorites()
+        val lists = LocalPlaylists.decode(ClientPrefs.prefs(this).getString(ClientPrefs.PLAYLISTS, null))
+        val fixture = KwCatalog.hotTags(listOf(mapOf("id" to "7", "digest" to "8", "name" to "热门")))
+        val lines = ArrayList<String>()
+        lines.add("收藏 " + favorites.size + " 首")
+        favorites.take(8).forEach { lines.add("★ " + it) }
+        if (lists.isEmpty()) lines.add("还没有保存在本机的歌单")
+        lists.forEach { list -> lines.add(list.name + " · " + list.tracks.size + " 首") }
+        lines.add("夹具歌单「" + fixture[0].name + "」只来自解析器，没有联网。")
+        lines.add("酷我歌单地址是明文，没有打开。酷狗更高音质需要验证，没有绕过。")
+        queue.text = lines.joinToString("\n")
     }
 
     private fun favorites(): MutableSet<String> {

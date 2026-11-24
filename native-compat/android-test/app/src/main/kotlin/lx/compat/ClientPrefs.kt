@@ -12,6 +12,7 @@ object ClientPrefs {
     const val FONT = "lrc_font_pt"
     const val QUEUE = "queue"
     const val FAVORITES = "favorites"
+    const val PLAYLISTS = "playlists"
 
     fun prefs(context: Context) = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 }

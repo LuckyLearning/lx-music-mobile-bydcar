@@ -43,6 +43,8 @@ class FloatingLyric(private val context: Context) {
         view?.text = text
     }
 
+    fun text(): String = view?.text?.toString() ?: ""
+
     fun hide() {
         val current = view ?: return
         val manager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager

@@ -136,6 +136,8 @@ PASS mg parser reads the nested result list
 PASS lyric cue parses minutes and fractions
 PASS lyric cue stays on the earlier line
 PASS lyric cue advances at the next stamp
+PASS local playlist roundtrip keeps the title and url
+PASS empty playlist text is an empty list
 INFO watchdog exit=137 elapsedMs=416
 PASS parent watchdog kills a silent child
 PASS runner stays up before setup
