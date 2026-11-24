@@ -281,17 +281,32 @@ class ScriptSandbox(
             }
             val exchange = try {
                 transport(outcome.second)
+            } catch (e: TransportException) {
+                deliver(item.key, error = e.message ?: "request failed", response = null)
+                continue
             } catch (e: Exception) {
                 deliver(item.key, error = "request failed", response = null)
                 continue
             }
-            deliver(item.key, error = null, response = scriptResponse(prepared, exchange))
+            val response = try {
+                scriptResponse(prepared, exchange)
+            } catch (e: TransportException) {
+                deliver(item.key, error = e.message ?: "body limit", response = null)
+                continue
+            }
+            deliver(item.key, error = null, response = response)
         }
+    }
+
+    /** JSON shape of a Node/RN Buffer after the old bridge's JSON.stringify + JSON.parse. Unsigned bytes. */
+    internal fun bufferValue(bytes: ByteArray): Map<String, Any?> {
+        if (bytes.size > 262_144) throw TransportException("body limit")
+        return linkedMapOf("type" to "Buffer", "data" to bytes.map { it.toInt() and 255 })
     }
 
     private fun scriptResponse(prepared: LegacyRequest.Prepared, exchange: Exchange): Map<String, Any?> {
         val body: Any? = if (prepared.binary) {
-            linkedMapOf("__lx_body" to "base64", "data" to Binary.encode(exchange.body))
+            bufferValue(exchange.body)
         } else {
             val text = exchange.body.toString(Charsets.UTF_8)
             try {

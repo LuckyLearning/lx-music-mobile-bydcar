@@ -48,7 +48,7 @@ private class ScriptedWorld {
     val pages = HashMap<String, ByteArray>()
     val opened = ArrayList<String>()
     val conns = ArrayList<FakeConn>()
-    val connector = Connector { host, ip, _ ->
+    val connector = Connector { host, ip, _, _, _ ->
         check("connector refuses private pins", Addresses.isPublic(ip), ip)
         opened.add("$host@$ip")
         val page = pages[host] ?: error("no page for $host")
@@ -84,6 +84,8 @@ fun main(args: Array<String>) {
     transportTests()
     businessTests()
     sourceTests(root, preload)
+    kwTests()
+    windowTests()
     check("parent watchdog kills a silent child", watchdogKillsSleep(), "")
     if (!runner.isFile) {
         check("sandbox runner exists", false, runner.path)
@@ -194,11 +196,34 @@ private fun ledgerTests() {
     generation.reset()
     check("reset makes an old ticket stale", generation.complete(old, 1) == Finish.UNKNOWN)
     check("unknown cancel is false", !ledger.cancel("missing"))
-    check("playback https is admitted", PlaybackUrlPolicy.admit("https://example.com/a.mp3") == "https://example.com/a.mp3")
+    val player = PlayerTransportPolicy()
+    check("playback https is admitted", player.decide("https://example.com/a.mp3") == PlaybackClass.HTTPS)
     var http = false
-    try { PlaybackUrlPolicy.admit("http://example.com/a.mp3") } catch (_: PolicyRejected) { http = true }
-    check("playback cleartext is rejected", http)
+    try { player.decide("http://example.com/a.mp3") } catch (_: PolicyRejected) { http = true }
+    check("playback cleartext is rejected unless the caller lists the host", http)
+    val supplied = mutableSetOf("cdn.example")
+    val scoped = PlayerTransportPolicy(supplied)
+    supplied.add("evil.example")
+    check("caller snapshot does not widen when the original set changes", scoped.decide("http://cdn.example/a.mp3") == PlaybackClass.SCOPED_CLEARTEXT)
+    var widened = false
+    try { scoped.decide("http://evil.example/a.mp3") } catch (_: PolicyRejected) { widened = true }
+    check("script cannot add a playback cleartext host", widened)
+    var literal = false
+    try { player.decide("https://127.0.0.1/a.mp3") } catch (_: PolicyRejected) { literal = true }
+    check("playback rejects a loopback literal", literal)
     check("late ticket key is retained until completion", late.key == "k")
+    val race = RequestLedger()
+    val ticket = race.begin("race", 0, 5_000)
+    val finish = arrayOfNulls<Finish>(1)
+    val cancelled = booleanArrayOf(false)
+    val threads = listOf(
+        Thread { cancelled[0] = race.cancel("race") },
+        Thread { finish[0] = race.complete(ticket, 1) },
+    )
+    threads.forEach { it.start() }
+    threads.forEach { it.join() }
+    val oneWinner = (cancelled[0] && finish[0] == Finish.UNKNOWN) || (!cancelled[0] && finish[0] == Finish.OK)
+    check("cancel and complete cannot both apply", oneWinner && race.size() == 0, "cancel=${cancelled[0]} finish=${finish[0]}")
 }
 
 private fun addressTests() {
@@ -212,12 +237,20 @@ private fun addressTests() {
     check("ipv6 loopback rejected", !Addresses.isPublic("::1"))
     check("documentation ipv6 rejected", !Addresses.isPublic("2001:db8::1"))
     check("global ipv6 accepted", Addresses.isPublic("2606:4700:4700::1111"))
+    check("ipv6 loopback link-local and ula rejected", !Addresses.isPublic("::1") && !Addresses.isPublic("fe80::1") && !Addresses.isPublic("fc00::1") && !Addresses.isPublic("fd00::1"))
     check("mapped ipv4 text is not parsed", Addresses.parse("::ffff:8.8.8.8") == null)
     check("leading zero ipv4 is not parsed", Addresses.parse("08.8.8.8") == null)
     val policy = NetworkPolicy(resolve = { error("dns") })
     var local = false
     try { policy.admit("http://example.com/", "GET", emptyList(), null, 1000, false) } catch (_: PolicyRejected) { local = true }
-    check("policy rejects cleartext", local)
+    check("script transport rejects cleartext by default", local)
+    val opened = mutableSetOf("legacy.example")
+    val scopedNet = NetworkPolicy(cleartextHosts = opened, resolve = { error("dns") })
+    opened.add("sneak.example")
+    check("script cleartext allowlist is a caller snapshot", scopedNet.admit("http://legacy.example/a", "GET", emptyList(), null, 1000, false).host == "legacy.example")
+    var sneak = false
+    try { scopedNet.admit("http://sneak.example/a", "GET", emptyList(), null, 1000, false) } catch (_: PolicyRejected) { sneak = true }
+    check("script cannot widen its own cleartext allowlist", sneak)
     var loop = false
     try { policy.admit("https://127.0.0.1/", "GET", emptyList(), null, 1000, false) } catch (_: PolicyRejected) { loop = true }
     check("policy rejects loopback literal", loop)
@@ -283,6 +316,23 @@ private fun transportTests() {
     var limited = false
     try { bomb.https(maxBody = 1024).execute(NetworkPolicy(resolve = { bomb.dns[it]!! }).admit("https://bomb.example/", "GET", emptyList(), null, 1000, false)) } catch (_: TransportException) { limited = true }
     check("gzip expansion stops at the body cap", limited)
+    val again = ScriptedWorld()
+    var lookups = 0
+    again.dns["rebind.example"] = listOf("1.1.1.1")
+    again.pages["rebind.example"] = http("302 Found", "Location: https://rebind.example/next")
+    val flipping = NetworkPolicy(resolve = { host ->
+        if (host != "rebind.example") error(host)
+        lookups++
+        if (lookups == 1) listOf("1.1.1.1") else listOf("127.0.0.1")
+    })
+    var rebound = false
+    try { PinnedHttps(flipping, again.connector).execute(flipping.admit("https://rebind.example/start", "GET", emptyList(), null, 1000, false)) } catch (_: PolicyRejected) { rebound = true }
+    check("second lookup of the same host is rechecked before another connect", rebound && again.opened == listOf("rebind.example@1.1.1.1"), again.opened.toString())
+    val v6 = ScriptedWorld()
+    v6.dns["v6.example"] = listOf("2606:4700:4700::1111")
+    v6.pages["v6.example"] = http("200 OK", "Content-Length: 2", "ok")
+    val v6result = v6.https().execute(NetworkPolicy(resolve = { v6.dns[it]!! }).admit("https://v6.example/", "GET", emptyList(), null, 1000, false))
+    check("public ipv6 is the pinned peer", v6result.peerIps == listOf("2606:4700:4700::1111") && v6.opened == listOf("v6.example@2606:4700:4700::1111"))
 }
 
 private fun businessTests() {
@@ -298,6 +348,45 @@ private fun businessTests() {
     updated.start("d", 0)
     updated.start("e", 0)
     check("source update fails pending requests", updated.onSourceUpdated() == listOf("request failed", "request failed") && updated.size() == 0)
+}
+
+private fun kwTests() {
+    check("html name decode", KwCatalog.decodeName("A&amp;B") == "A&B" && KwCatalog.decodeName(null) == "")
+    check("singer joiner follows decode", KwCatalog.formatSinger(KwCatalog.decodeName("X&amp;Y")) == "X、Y")
+    check("play time formatting", KwCatalog.formatPlayTime(0) == "--/--" && KwCatalog.formatPlayTime(200) == "03:20")
+    val url = KwCatalog.searchUrl("你好", 2, 30)
+    check("kw search url matches the legacy builder", url.startsWith("http://search.kuwo.cn/r.s?") && url.contains("pn=1") && url.contains("rn=30") && url.contains("all="))
+    var fetched = false
+    try {
+        NetworkPolicy(resolve = { error("no dns") }).admit(url, "GET", emptyList(), null, 1000, false)
+    } catch (e: PolicyRejected) {
+        fetched = e.message == "cleartext"
+    }
+    check("kw search url is not fetched and is cleartext until the caller allows it", fetched)
+    check("caller can scope that one host", PlayerTransportPolicy(setOf(KwCatalog.SEARCH_HOST)).decide("http://${KwCatalog.SEARCH_HOST}/r.s") == PlaybackClass.SCOPED_CLEARTEXT)
+    val rows = listOf(mapOf(
+        "MUSICRID" to "MUSIC_123",
+        "N_MINFO" to "level:h,bitrate:320,format:mp3,size:4.1m;level:s,bitrate:128,format:mp3,size:1.6m",
+        "DURATION" to "200",
+        "SONGNAME" to "A&amp;B",
+        "ARTIST" to "X&amp;Y",
+        "ALBUM" to "Album",
+    ))
+    val parsed = KwCatalog.parseSearchList(rows)
+    check("kw search parser keeps qualities in source order after reverse", parsed != null && parsed[0].songmid == "123" && parsed[0].qualities == listOf("128k", "320k") && parsed[0].name == "A&B" && parsed[0].singer == "X、Y" && parsed[0].interval == "03:20", parsed.toString())
+    check("missing quality info fails the list", KwCatalog.parseSearchList(listOf(mapOf("MUSICRID" to "MUSIC_1"))) == null)
+    check("playlist urls are builders only", KwCatalog.playlistListUrl("new", null, null, 1)!!.contains("order=new") && KwCatalog.playlistDetailUrl("2858093057", 2).contains("pn=1"))
+    val tags = KwCatalog.hotTags(listOf(mapOf("id" to "7", "digest" to "8", "name" to "热门")))
+    check("hot playlist tags keep id-digest", tags[0].id == "7-8" && tags[0].name == "热门")
+    val groups = KwCatalog.tagGroups(listOf(mapOf("id" to "1", "name" to "主题", "data" to listOf(mapOf("id" to "9", "name" to "夜晚")))))
+    check("playlist tag groups keep the parent", groups[0].parentName == "主题" && groups[0].id == "9")
+}
+
+private fun windowTests() {
+    check("phone portrait", WindowProfile.classify(1080, 1920, 2.5f) == "phone-portrait")
+    check("planned byd full width", WindowProfile.classify(1920, 984, 1.5f) == "car-full")
+    check("planned byd 70 percent pane", WindowProfile.classify(1344, 984, 1.5f) == "car-70")
+    check("planned byd 30 percent pane", WindowProfile.classify(576, 984, 1.5f) == "car-30")
 }
 
 private fun sourceTests(root: File, preload: File) {
@@ -380,8 +469,9 @@ private fun sandboxTests(runner: File, preload: File) {
         val url = box.events.last { it.action == "response" }.data["result"].obj()["data"].obj()["url"].str()
         check("preload still accepts a cleartext musicUrl string", url == "http://cdn.example/a.mp3")
         var play = false
-        try { PlaybackUrlPolicy.admit(url) } catch (_: PolicyRejected) { play = true }
-        check("playback policy still rejects that cleartext string", play)
+        try { PlayerTransportPolicy().decide(url) } catch (_: PolicyRejected) { play = true }
+        check("player policy rejects that cleartext string until the caller allows the host", play)
+        check("the musicUrl string itself is unchanged", url == "http://cdn.example/a.mp3")
     }
 
     open().use { box ->
@@ -478,8 +568,22 @@ private fun sandboxTests(runner: File, preload: File) {
     }).use { box ->
         box.start(); box.setup()
         box.eval("lx.request('https://example.com/b',{binary:true}, function(err, resp){ globalThis.__bin = err ? String(err.message) : JSON.stringify(resp.body); });")
-        val expect = """{"__lx_body":"base64","data":"${Binary.encode(rawBin)}"}"""
-        check("binary response reaches the script as base64, not a Buffer", box.eval("globalThis.__bin")["value"] == expect, "${box.eval("globalThis.__bin")["value"]}")
+        val seen = box.eval("globalThis.__bin")["value"]
+        check(
+            "binary response is a Buffer data array of unsigned bytes",
+            seen == """{"type":"Buffer","data":[0,128,255]}""",
+            "$seen",
+        )
+        val rebuilt = box.eval("var b=JSON.parse(globalThis.__bin); var u=new Uint8Array(b.data); u.length+':'+u[0]+','+u[1]+','+u[2]")
+        check("script can rebuild a typed array from the buffer payload", rebuilt["value"] == "3:0,128,255", "${rebuilt["value"]}")
+    }
+
+    open(transport = {
+        Exchange(200, "OK", linkedMapOf("content-type" to "application/octet-stream"), ByteArray(262_145), listOf("1.1.1.1"))
+    }).use { box ->
+        box.start(); box.setup()
+        box.eval("lx.request('https://example.com/big',{binary:true}, function(err){ globalThis.__big = err ? String(err.message) : 'ok'; });")
+        check("oversized binary body is rejected", box.eval("globalThis.__big")["value"] == "body limit" && box.httpAttempts.size == 1, "${box.eval("globalThis.__big")["value"]}")
     }
 
     open(childCpuMs = 1500, replyTimeoutMs = 6_000, parentBudgetMs = 10_000).use { box ->

@@ -11,7 +11,7 @@
 | 官方 `user-api-preload.js` 在受限 QuickJS 里执行，并用测试核对初始化、音质交集、Promise 顺序、歌词边界、定时器、取消、HTTP 整形 | 通过。证据在 `reports/gate-results.txt`，`SUMMARY failed=0` |
 | 无限循环、内存上限、父进程静默看门狗、子进程墙钟看门狗 | 通过。退出码分别是 70、70、父进程杀死 sleep（137）、子进程 72 |
 | 公开 HTTPS `https://example.com/`，地址钉死且为公网 | 通过。没有请求任何音源服务 |
-| arm64-v8a / Android API 21 的 JNI 库编译 | 编过，没有在设备或模拟器加载。见 `reports/android-arm64.txt` |
+| 独立测试包 `cn.toside.music.mobile.nativegate.test`，minSdk 21，isolated 服务 | 已编 debug APK。API 21 x86 与 Android 12 x86_64 模拟器各跑通 4 项隔离测试。arm64 库在包里，没有被加载。见 `reports/emulator-isolation.txt` |
 | 候选 Compose 1.9.5 / Media3 1.8.0 / Room 2.7.2 / DataStore 1.1.7 的运行时 AAR `minSdk` | 176 个读到数字的 AAR 最大是 21，没有高于 21 的。见 `reports/minsdk-closure.txt`。没有做 Gradle manifest 合并，也没有编进 APK |
 | 真实第三方音源、旧版手机基线、搜索/歌单移植、播放器、车机 UI | **没有做，不能写成兼容通过** |
 

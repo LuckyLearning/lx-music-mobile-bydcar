@@ -18,7 +18,7 @@ interface ByteConn : Closeable {
 }
 
 fun interface Connector {
-    fun open(host: String, ip: String, timeoutMs: Int): ByteConn
+    fun open(host: String, ip: String, port: Int, tls: Boolean, timeoutMs: Int): ByteConn
 }
 
 data class Exchange(
@@ -79,7 +79,9 @@ class PinnedHttps(
     }
 
     private fun one(admission: Admission, method: String, body: ByteArray?, ip: String): Exchange {
-        connector.open(admission.host, ip, admission.timeoutMs.toInt()).use { conn ->
+        val tls = admission.uri.scheme == "https"
+        val port = if (admission.uri.port != -1) admission.uri.port else if (tls) 443 else 80
+        connector.open(admission.host, ip, port, tls, admission.timeoutMs.toInt()).use { conn ->
             val bytes = render(admission, method, body)
             conn.writeFully(bytes)
             if (body != null && method != "GET") conn.writeFully(body)
@@ -247,7 +249,8 @@ class PinnedHttps(
 }
 
 object TlsConnector : Connector {
-    override fun open(host: String, ip: String, timeoutMs: Int): ByteConn {
+    override fun open(host: String, ip: String, port: Int, tls: Boolean, timeoutMs: Int): ByteConn {
+        if (!tls || port != 443) throw TransportException("tls required")
         if (!Addresses.isPublic(ip)) throw TransportException("pin")
         val tcp = Socket()
         tcp.connect(InetSocketAddress(ip, 443), timeoutMs)

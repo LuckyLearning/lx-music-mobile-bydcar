@@ -105,8 +105,11 @@ class PolicyRejected(message: String) : Exception(message)
 
 class NetworkPolicy(
     private val allowHosts: Set<String>? = null,
+    /** Caller-owned snapshot. A script cannot add hosts. Empty means script lx.request stays HTTPS-only. */
+    cleartextHosts: Set<String> = emptySet(),
     private val resolve: (String) -> List<String>,
 ) {
+    private val cleartextHosts = cleartextHosts.map { it.lowercase() }.toSet()
     fun admit(url: String, method: String, headers: List<Pair<String, String>>, body: ByteArray?, timeoutMs: Long, binary: Boolean): Admission {
         if (url.length > 2048) throw PolicyRejected("URL length")
         val uri = try {
@@ -114,8 +117,12 @@ class NetworkPolicy(
         } catch (e: Exception) {
             throw PolicyRejected("URL")
         }
-        if (uri.scheme != "https" || uri.rawUserInfo != null || uri.rawFragment != null) throw PolicyRejected("URL scheme")
-        if (uri.port != -1 && uri.port != 443) throw PolicyRejected("URL port")
+        if (uri.rawUserInfo != null || uri.rawFragment != null) throw PolicyRejected("URL scheme")
+        val cleartext = uri.scheme == "http"
+        if (uri.scheme != "https" && !cleartext) throw PolicyRejected("URL scheme")
+        if (cleartext && uri.host?.lowercase() !in cleartextHosts) throw PolicyRejected("cleartext")
+        val expectedPort = if (cleartext) 80 else 443
+        if (uri.port != -1 && uri.port != expectedPort) throw PolicyRejected("URL port")
         val host = uri.host?.lowercase() ?: throw PolicyRejected("URL host")
         if (!host.matches(Regex("[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+"))) {
             throw PolicyRejected("URL host")
@@ -206,15 +213,38 @@ class RequestLedger(private val maxPending: Int = 8, private val maxTotal: Int =
     @Synchronized fun total(): Int = total
 }
 
-/** musicUrl strings the preload accepts are not automatically playable. */
-object PlaybackUrlPolicy {
-    fun admit(url: String): String {
-        if (url.length > 2048 || !url.startsWith("https://")) {
+enum class PlaybackClass { HTTPS, SCOPED_CLEARTEXT }
+
+/**
+ * Player fetch policy for a musicUrl string the script already returned.
+ * Returning `http://` from a script is not the same as lx.request, and this check does not rewrite
+ * that string. Cleartext playback is off unless the caller listed that exact host. The script has
+ * no method that can add a host.
+ */
+class PlayerTransportPolicy(cleartextHosts: Set<String> = emptySet()) {
+    private val cleartextHosts = cleartextHosts.map { it.lowercase() }.toSet()
+
+    fun decide(url: String): PlaybackClass {
+        if (url.length > 2048) throw PolicyRejected("Playback URL")
+        val uri = try {
+            URI(url)
+        } catch (e: Exception) {
             throw PolicyRejected("Playback URL")
         }
-        val uri = URI(url)
-        if (uri.rawUserInfo != null || uri.host.isNullOrBlank()) throw PolicyRejected("Playback URL")
-        if (uri.scheme != "https") throw PolicyRejected("Playback URL")
-        return url
+        val host = uri.host?.lowercase() ?: throw PolicyRejected("Playback URL")
+        if (uri.rawUserInfo != null || uri.rawFragment != null) throw PolicyRejected("Playback URL")
+        if (Addresses.parse(host) != null && !Addresses.isPublic(host)) throw PolicyRejected("Playback private address")
+        return when (uri.scheme) {
+            "https" -> {
+                if (uri.port != -1 && uri.port != 443) throw PolicyRejected("Playback URL")
+                PlaybackClass.HTTPS
+            }
+            "http" -> {
+                if (uri.port != -1 && uri.port != 80) throw PolicyRejected("Playback URL")
+                if (host !in cleartextHosts) throw PolicyRejected("Playback cleartext")
+                PlaybackClass.SCOPED_CLEARTEXT
+            }
+            else -> throw PolicyRejected("Playback URL")
+        }
     }
 }

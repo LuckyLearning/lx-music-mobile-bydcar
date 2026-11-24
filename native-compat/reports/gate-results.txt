@@ -29,8 +29,12 @@ PASS late completion removes the ticket
 PASS reset makes an old ticket stale
 PASS unknown cancel is false
 PASS playback https is admitted
-PASS playback cleartext is rejected
+PASS playback cleartext is rejected unless the caller lists the host
+PASS caller snapshot does not widen when the original set changes
+PASS script cannot add a playback cleartext host
+PASS playback rejects a loopback literal
 PASS late ticket key is retained until completion
+PASS cancel and complete cannot both apply
 PASS public ipv4
 PASS loopback rejected
 PASS rfc1918 rejected
@@ -41,9 +45,12 @@ PASS multicast rejected
 PASS ipv6 loopback rejected
 PASS documentation ipv6 rejected
 PASS global ipv6 accepted
+PASS ipv6 loopback link-local and ula rejected
 PASS mapped ipv4 text is not parsed
 PASS leading zero ipv4 is not parsed
-PASS policy rejects cleartext
+PASS script transport rejects cleartext by default
+PASS script cleartext allowlist is a caller snapshot
+PASS script cannot widen its own cleartext allowlist
 PASS policy rejects loopback literal
 PASS policy rejects header injection
 PASS form body uses encodeURIComponent
@@ -63,6 +70,10 @@ PASS connector refuses private pins
 PASS gzip body is inflated under the cap
 PASS connector refuses private pins
 PASS gzip expansion stops at the body cap
+PASS connector refuses private pins
+PASS second lookup of the same host is rechecked before another connect
+PASS connector refuses private pins
+PASS public ipv6 is the pinned peer
 PASS business success before 20s
 PASS business timeout message
 PASS result after deadline reports timeout once
@@ -76,7 +87,22 @@ PASS xm is not an active built-in source id
 PASS outer bridge timeout is 20s and cancel hook is empty
 PASS formData branch reads form
 PASS default http timeout is 13s
-INFO watchdog exit=137 elapsedMs=418
+PASS html name decode
+PASS singer joiner follows decode
+PASS play time formatting
+PASS kw search url matches the legacy builder
+PASS kw search url is not fetched and is cleartext until the caller allows it
+PASS caller can scope that one host
+PASS kw search parser keeps qualities in source order after reverse
+PASS missing quality info fails the list
+PASS playlist urls are builders only
+PASS hot playlist tags keep id-digest
+PASS playlist tag groups keep the parent
+PASS phone portrait
+PASS planned byd full width
+PASS planned byd 70 percent pane
+PASS planned byd 30 percent pane
+INFO watchdog exit=137 elapsedMs=426
 PASS parent watchdog kills a silent child
 PASS runner stays up before setup
 PASS lx version env and script info
@@ -91,7 +117,8 @@ PASS local actions stay and online qualities do not apply
 PASS xm and non-music tx are absent
 PASS musicUrl https is accepted by preload
 PASS preload still accepts a cleartext musicUrl string
-PASS playback policy still rejects that cleartext string
+PASS player policy rejects that cleartext string until the caller allows the host
+PASS the musicUrl string itself is unchanged
 PASS lyric boundaries match preload
 PASS request before on() fails closed
 PASS init runs after on() microtasks
@@ -108,7 +135,9 @@ PASS preload utf-8 quirk keeps the 3-byte decoder
 PASS preload utf-8 still decodes BMP
 PASS preload md5 encodes then the host decodes
 PASS update alert is once and a short invalid url is kept
-PASS binary response reaches the script as base64, not a Buffer
+PASS binary response is a Buffer data array of unsigned bytes
+PASS script can rebuild a typed array from the buffer payload
+PASS oversized binary body is rejected
 PASS infinite loop exits 70
 PASS memory limit exits 70
 PASS child watchdog exits 72 while the parent is silent

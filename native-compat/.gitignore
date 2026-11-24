@@ -1,6 +1,11 @@
 artifacts/
 *.class
 *.jar
+!android-test/gradle/wrapper/gradle-wrapper.jar
 *.so
 *.apk
 .local/
+android-test/.gradle/
+android-test/local.properties
+android-test/**/build/
+android-test/.cxx/
