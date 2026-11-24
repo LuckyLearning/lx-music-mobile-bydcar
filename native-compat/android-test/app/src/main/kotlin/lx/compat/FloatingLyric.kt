@@ -13,14 +13,15 @@ class FloatingLyric(private val context: Context) {
     private var view: TextView? = null
 
     fun show(text: String) {
-        val manager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val app = context.applicationContext
+        val manager = app.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val current = view
         if (current == null) {
-            val created = TextView(context).apply {
-                setTextColor(0xFFFFFFFF.toInt())
-                setBackgroundColor(0xCC101014.toInt())
-                textSize = 18f
-                setPadding(24, 12, 24, 12)
+            val created = TextView(app).apply {
+                setTextColor(0xFF111111.toInt())
+                setBackgroundColor(0xFFFFE14A.toInt())
+                textSize = 22f
+                setPadding(24, 16, 24, 16)
             }
             val type = if (Build.VERSION.SDK_INT >= 26) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -36,7 +37,7 @@ class FloatingLyric(private val context: Context) {
                 PixelFormat.TRANSLUCENT,
             )
             params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            params.y = 48
+            params.y = 96
             manager.addView(created, params)
             view = created
         }

@@ -688,6 +688,13 @@ private fun catalogTests() {
     check("lyric cue advances at the next stamp", LyricCue.current(lines, 3000)?.text == "two")
     val stored = LocalPlaylists.decode(LocalPlaylists.encode(listOf(SavedList("晚", listOf(SavedTrack("歌", "https://example.com/a.mp3"))))))
     check("local playlist roundtrip keeps the title and url", stored.size == 1 && stored[0].name == "晚" && stored[0].tracks[0].uri == "https://example.com/a.mp3")
+    val musicUrl = Json.parse(LegacyMusicUrl.requestJson("kg", "320k", mapOf("songmid" to "7", "hash" to "abc", "name" to "N"))).obj()
+    val data = musicUrl["data"].obj()
+    val info = data["info"].obj()
+    check(
+        "musicUrl request matches the original user-api shape",
+        data["source"] == "kg" && data["action"] == "musicUrl" && info["type"] == "320k" && info["musicInfo"].obj()["hash"] == "abc",
+    )
     check("empty playlist text is an empty list", LocalPlaylists.decode(null).isEmpty() && LocalPlaylists.decode("not-json").isEmpty())
 }
 

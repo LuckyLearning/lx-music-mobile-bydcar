@@ -49,6 +49,7 @@ class PlayerActivity : Activity() {
     private var searchHits: List<Map<String, Any?>> = emptyList()
     private var searchQuality = "128k"
     private var floating: FloatingLyric? = null
+    private var holdOverlay = false
 
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
@@ -94,6 +95,18 @@ class PlayerActivity : Activity() {
         root.requestApplyInsets()
         root.viewTreeObserver.addOnGlobalLayoutListener { applyWindow() }
         connect()
+        root.post {
+            intent.getStringExtra("lx.overlay")?.let { line ->
+                val created = FloatingLyric(applicationContext)
+                try {
+                    created.show(line)
+                    floating = created
+                    holdOverlay = true
+                } catch (_: RuntimeException) {
+                    floating = null
+                }
+            }
+        }
     }
 
     override fun onResume() {
@@ -182,6 +195,7 @@ class PlayerActivity : Activity() {
             button("下一首") { controller?.seekToNextMediaItem() },
             button("顺序") { cycleMode() }.also { modeButton = it },
             button("收藏") { toggleFavorite() }.also { favoriteButton = it },
+            button("播放收藏") { playFavorites() },
             button("歌单") { showPlaylists() },
             button("保存歌单") { savePlaylist() },
             button("打开歌单") { openSavedPlaylist() },
@@ -384,8 +398,8 @@ class PlayerActivity : Activity() {
             current.repeatMode == Player.REPEAT_MODE_ALL -> "列表"
             else -> "顺序"
         }
-        val id = current.currentMediaItem?.mediaId
-        favoriteButton.text = if (id != null && favorites().contains(id)) "已收藏" else "收藏"
+        val uri = current.currentMediaItem?.localConfiguration?.uri?.toString()
+        favoriteButton.text = if (uri != null && favoriteTracks().any { it.uri == uri }) "已收藏" else "收藏"
         val title = current.mediaMetadata.title ?: current.currentMediaItem?.mediaMetadata?.title
         cover.text = title?.toString()?.ifEmpty { null } ?: "封面"
         val error = current.playerError
@@ -422,7 +436,7 @@ class PlayerActivity : Activity() {
             if (lyric.text.toString() != line) lyric.text = line
         }
         val overlay = floating
-        if (overlay != null && overlay.visible()) {
+        if (!holdOverlay && overlay != null && overlay.visible()) {
             val line = if (lyricCues.isNotEmpty()) LyricCue.current(lyricCues, pos)?.text ?: lyricSource else lyric.text.toString()
             try {
                 overlay.show(line)
@@ -476,11 +490,24 @@ class PlayerActivity : Activity() {
     }
 
     private fun toggleFavorite() {
-        val id = controller?.currentMediaItem?.mediaId ?: return
-        val values = favorites()
-        if (!values.add(id)) values.remove(id)
-        ClientPrefs.prefs(this).edit().putString(ClientPrefs.FAVORITES, Json.stringify(values.toList())).apply()
+        val media = controller?.currentMediaItem ?: return
+        val uri = media.localConfiguration?.uri?.toString() ?: return
+        if (uri.isEmpty()) return
+        val title = media.mediaMetadata.title?.toString()?.ifEmpty { null } ?: media.mediaId
+        val tracks = favoriteTracks()
+        val existing = tracks.indexOfFirst { it.uri == uri }
+        if (existing >= 0) tracks.removeAt(existing) else tracks.add(0, SavedTrack(title, uri))
+        ClientPrefs.prefs(this).edit().putString(ClientPrefs.FAVORITES, LocalPlaylists.encode(listOf(SavedList("收藏", tracks)))).apply()
         render()
+    }
+
+    private fun playFavorites() {
+        val tracks = favoriteTracks().filter { playableUri(it.uri) }
+        if (tracks.isEmpty()) {
+            queue.text = "收藏里没有可播放的地址"
+            return
+        }
+        startTracks(tracks, "收藏")
     }
 
     private fun savePlaylist() {
@@ -509,21 +536,35 @@ class PlayerActivity : Activity() {
             queue.text = "没有已保存的歌单"
             return
         }
+        startTracks(list.tracks.filter { playableUri(it.uri) }, list.name)
+    }
+
+    private fun startTracks(tracks: List<SavedTrack>, name: String) {
+        val current = controller
+        if (current == null || tracks.isEmpty()) {
+            queue.text = "「" + name + "」里没有可播放的地址"
+            return
+        }
         current.clearMediaItems()
-        list.tracks.forEach { track ->
+        tracks.forEach { track ->
             current.addMediaItem(item(track.uri, track.title, Uri.parse(track.uri)))
         }
         current.prepare()
-        queue.text = "已打开「" + list.name + "」，没有自动播放"
+        current.play()
+        queue.text = "正在播放「" + name + "」"
+    }
+
+    private fun playableUri(uri: String): Boolean {
+        return uri.startsWith("https://") || uri.startsWith("content://") || uri.startsWith("asset://") || uri.startsWith("file://")
     }
 
     private fun showPlaylists() {
-        val favorites = favorites()
+        val favorites = favoriteTracks()
         val lists = LocalPlaylists.decode(ClientPrefs.prefs(this).getString(ClientPrefs.PLAYLISTS, null))
         val fixture = KwCatalog.hotTags(listOf(mapOf("id" to "7", "digest" to "8", "name" to "热门")))
         val lines = ArrayList<String>()
         lines.add("收藏 " + favorites.size + " 首")
-        favorites.take(8).forEach { lines.add("★ " + it) }
+        favorites.take(8).forEach { lines.add("★ " + it.title) }
         if (lists.isEmpty()) lines.add("还没有保存在本机的歌单")
         lists.forEach { list -> lines.add(list.name + " · " + list.tracks.size + " 首") }
         lines.add("夹具歌单「" + fixture[0].name + "」只来自解析器，没有联网。")
@@ -531,13 +572,9 @@ class PlayerActivity : Activity() {
         queue.text = lines.joinToString("\n")
     }
 
-    private fun favorites(): MutableSet<String> {
-        val raw = ClientPrefs.prefs(this).getString(ClientPrefs.FAVORITES, null) ?: return linkedSetOf()
-        return try {
-            Json.parse(raw).list().mapNotNull { it as? String }.toMutableSet()
-        } catch (_: RuntimeException) {
-            linkedSetOf()
-        }
+    private fun favoriteTracks(): MutableList<SavedTrack> {
+        val lists = LocalPlaylists.decode(ClientPrefs.prefs(this).getString(ClientPrefs.FAVORITES, null))
+        return (lists.firstOrNull()?.tracks ?: emptyList()).toMutableList()
     }
 
     private fun openAudio() {
@@ -687,14 +724,35 @@ class PlayerActivity : Activity() {
             return
         }
         val requested = if (hashes[searchQuality] is String) searchQuality else "128k"
-        queue.text = "正在向酷狗要 " + requested + " 的播放地址"
+        val musicInfo = mapOf(
+            "source" to "kg",
+            "name" to (hit["name"].strOrNull() ?: ""),
+            "singer" to (hit["singer"].strOrNull() ?: ""),
+            "songmid" to (hit["songmid"].strOrNull() ?: ""),
+            "hash" to hash,
+            "albumName" to (hit["albumName"].strOrNull() ?: ""),
+            "interval" to (hit["interval"].strOrNull() ?: ""),
+        )
+        queue.text = "按原版把 " + requested + " 交给音源脚本"
         Thread {
             val json = try {
-                ensureBroker().playKg(hash, requested)
+                ensureBroker().resolveReviewed(LegacyMusicUrl.requestJson("kg", requested, musicInfo))
             } catch (_: Exception) {
-                "{\"error\":\"broker\",\"https\":false}"
+                "{\"admitted\":\"rejected\"}"
             }
-            handler.post { playKgResult(json, hit["name"].strOrNull() ?: "酷狗", requested) }
+            handler.post {
+                val root = try {
+                    Json.parse(json).obj()
+                } catch (_: RuntimeException) {
+                    queue.text = "脚本结果没有解析出来"
+                    return@post
+                }
+                if (root["admitted"] == "HTTPS" && !root["url"].strOrNull().isNullOrEmpty()) {
+                    playResolved(json)
+                } else {
+                    queue.text = "音源脚本没有返回播放地址。原版这里不会改走别的接口。"
+                }
+            }
         }.start()
     }
 

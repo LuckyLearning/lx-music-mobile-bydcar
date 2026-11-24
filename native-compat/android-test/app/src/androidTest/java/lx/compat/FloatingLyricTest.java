@@ -36,10 +36,12 @@ public class FloatingLyricTest {
         });
         assertTrue(failure[0] == null ? "overlay was not added" : failure[0], failure[0] == null);
         assertEquals("歌词测试行", line[0]);
+        Thread.sleep(4000);
         Bitmap shot = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
         if (shot != null) {
             Context test = InstrumentationRegistry.getInstrumentation().getContext();
-            FileOutputStream out = new FileOutputStream(new File(test.getFilesDir(), "lyric-overlay.png"));
+            File file = new File(test.getFilesDir(), "lyric-overlay.png");
+            FileOutputStream out = new FileOutputStream(file);
             shot.compress(Bitmap.CompressFormat.PNG, 100, out);
             out.close();
         }

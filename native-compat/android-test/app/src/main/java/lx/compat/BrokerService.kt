@@ -48,6 +48,7 @@ class BrokerService : Service() {
                     "name" to track.name.take(80),
                     "singer" to track.singer.take(80),
                     "songmid" to track.songmid.take(64),
+                    "albumName" to track.albumName.take(80),
                     "interval" to track.interval,
                     "qualities" to track.qualities,
                     "hashes" to track.hashes,
