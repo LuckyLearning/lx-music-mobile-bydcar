@@ -18,6 +18,8 @@ class AndroidHost(
     private val ledger = RequestLedger()
     private var commandId = 1L
     private var draining = false
+    var playbackUrl: String? = null
+        private set
 
     private class Pending(val key: String, val ticket: RequestLedger.Ticket, val url: String, val options: Map<String, Any?>, var cancelled: Boolean = false)
 
@@ -51,6 +53,13 @@ class AndroidHost(
     }
 
     fun runPreload(send: (String) -> String, preload: String, script: String, request: String?): String {
+        synchronized(lock) {
+            notes.setLength(0)
+            queued.clear()
+            delivered.clear()
+            playbackUrl = null
+        }
+        ledger.reset()
         command(send, mapOf("op" to "preload", "code" to preload))
         command(send, linkedMapOf(
             "op" to "setup", "key" to "gate-key", "scriptId" to "sample", "name" to "sample",
@@ -91,6 +100,7 @@ class AndroidHost(
             val prepared = LegacyRequest.prepare(item.options)
             if (prepared.rejected != null) {
                 ledger.complete(item.ticket, clock())
+                note("http-rejected reason=${prepared.rejected}")
                 deliver(send, item.key, prepared.rejected, null)
                 continue
             }
@@ -179,7 +189,13 @@ class AndroidHost(
                         else -> null
                     }
                 }
+                if (!url.isNullOrEmpty()) playbackUrl = url
                 note("script-response status=${map["status"]} error=$err urlHost=${url?.let { safeHost(it) }}")
+            }
+            "showUpdateAlert" -> {
+                val log = (data as? Map<*, *>)?.get("log")?.toString() ?: ""
+                if (log.length <= 200 && log.all { it.isLetterOrDigit() || it in "=;._-" }) note("alert $log")
+                else note("alert-rejected")
             }
             else -> note("event $action")
         }

@@ -43,6 +43,9 @@ class PlayerActivity : Activity() {
     private var systemBottomInset = 0
     private var dragging = false
     private var fontRepeat: Runnable? = null
+    private var broker: IBroker? = null
+    private var lyricSource = "还没有歌词。可以打开一个文本歌词，字号最小是 1，没有上限。"
+    private var lyricCues: List<LyricCue.Line> = emptyList()
 
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
@@ -146,7 +149,7 @@ class PlayerActivity : Activity() {
         }
         status = text("正在连接播放服务", 14f)
         body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        lyric = text("还没有歌词。可以打开一个文本歌词，字号最小是 1，没有上限。", 21f).apply {
+        lyric = text(lyricSource, 21f).apply {
             setOnClickListener { reveal() }
         }
         cover = text("封面", 18f).apply {
@@ -178,6 +181,8 @@ class PlayerActivity : Activity() {
             button("收藏") { toggleFavorite() }.also { favoriteButton = it },
             button("打开音频") { openAudio() },
             button("测试音") { addTone() },
+            button("酷狗搜索") { searchKg() },
+            button("播放样本") { playReviewedSample() },
             button("歌词") { openLyric() },
             button("重试") { controller?.let { it.prepare(); it.play() } },
             button("设置") { toggleSettings() },
@@ -238,7 +243,7 @@ class PlayerActivity : Activity() {
         bindStep(smaller, -1)
         bindStep(larger, 1)
         panel.addView(row(smaller, larger))
-        panel.addView(text("在线搜索和各平台歌单还没有完成音源对照，这里只筛选本机队列。", 13f))
+        panel.addView(text("酷狗搜索走 HTTPS。播放地址只接受已审核脚本返回的 HTTPS。QQ、网易的签名请求还没迁。酷我搜索是明文，这里不直接打开。", 13f))
         return panel
     }
 
@@ -403,6 +408,10 @@ class PlayerActivity : Activity() {
         val pos = current.currentPosition.coerceAtLeast(0L)
         seek.progress = if (pos > Int.MAX_VALUE) Int.MAX_VALUE else pos.toInt()
         position.text = format(pos) + " / " + format(if (duration < 0) 0 else duration)
+        if (lyricCues.isNotEmpty()) {
+            val line = LyricCue.current(lyricCues, pos)?.text ?: lyricSource
+            if (lyric.text.toString() != line) lyric.text = line
+        }
     }
 
     private fun togglePlay() {
@@ -508,7 +517,113 @@ class PlayerActivity : Activity() {
         } catch (_: Exception) {
             "歌词没有读出来"
         }
-        lyric.text = if (text.length > 51_200) text.substring(0, 51_200) else text
+        showLyric(if (text.length > 51_200) text.substring(0, 51_200) else text)
+    }
+
+    private fun showLyric(text: String) {
+        lyricSource = text
+        lyricCues = LyricCue.parse(text)
+        if (lyricCues.isEmpty()) lyric.text = text
+        else renderProgress()
+    }
+
+    private fun searchKg() {
+        val query = filter.text?.toString()?.trim().orEmpty()
+        if (query.isEmpty()) {
+            queue.text = "先在筛选框里写下要搜的词。这也会筛选本机队列。"
+            return
+        }
+        queue.text = "正在搜索酷狗"
+        Thread {
+            val json = try {
+                ensureBroker().searchKg(query)
+            } catch (_: Exception) {
+                "{\"error\":\"broker\"}"
+            }
+            handler.post { showSearch(json) }
+        }.start()
+    }
+
+    private fun showSearch(json: String) {
+        val root = try {
+            Json.parse(json).obj()
+        } catch (_: RuntimeException) {
+            queue.text = "搜索结果没有解析出来"
+            return
+        }
+        if (root["error"] is String) {
+            queue.text = "搜索没有完成"
+            return
+        }
+        if (root["upstream"] == true) {
+            queue.text = "酷狗搜索没有返回可用结果，状态 " + root["status"] + "。这是上游结果，不是兼容通过。"
+            return
+        }
+        val rows = root["tracks"]?.list() ?: emptyList()
+        if (rows.isEmpty()) {
+            queue.text = "酷狗没有解析出曲目"
+            return
+        }
+        queue.text = rows.mapIndexed { index, row ->
+            val item = row.obj()
+            val qualities = (item["qualities"]?.list() ?: emptyList()).mapNotNull { it as? String }
+            (index + 1).toString() + ". " + item["name"].strOrNull().orEmpty() + " — " + item["singer"].strOrNull().orEmpty() + "  " + qualities.joinToString("/")
+        }.joinToString("\n") + "\n这些结果还没有播放地址。只有已审核脚本返回 HTTPS 时才会播放。"
+    }
+
+    private fun playReviewedSample() {
+        queue.text = "正在向已审核脚本要播放地址"
+        Thread {
+            val request = "{\"requestKey\":\"p1\",\"data\":{\"source\":\"kg\",\"action\":\"musicUrl\",\"info\":{\"type\":\"128k\",\"musicInfo\":{\"songmid\":\"public-tone\"}}}}"
+            val json = try {
+                ensureBroker().resolveReviewed(request)
+            } catch (_: Exception) {
+                "{\"admitted\":\"rejected\"}"
+            }
+            handler.post { playResolved(json) }
+        }.start()
+    }
+
+    private fun playResolved(json: String) {
+        val root = try {
+            Json.parse(json).obj()
+        } catch (_: RuntimeException) {
+            queue.text = "脚本结果没有解析出来"
+            return
+        }
+        val url = root["url"].strOrNull()
+        if (root["admitted"] != "HTTPS" || url.isNullOrEmpty()) {
+            queue.text = "已审核脚本没有给出可播放的 HTTPS 地址"
+            return
+        }
+        val current = controller
+        if (current == null) {
+            queue.text = "播放服务还没有连上"
+            return
+        }
+        current.addMediaItem(item("public-tone", "已审核样本", Uri.parse(url)))
+        current.seekTo(current.mediaItemCount - 1, 0)
+        current.prepare()
+        current.play()
+        showLyric("[00:00.00]样本开始\n[00:01.00]样本继续")
+    }
+
+    private fun ensureBroker(): IBroker {
+        broker?.let { return it }
+        val latch = java.util.concurrent.CountDownLatch(1)
+        val ref = java.util.concurrent.atomic.AtomicReference<IBroker>()
+        bindService(android.content.Intent(this, BrokerService::class.java), object : android.content.ServiceConnection {
+            override fun onServiceConnected(name: android.content.ComponentName, service: android.os.IBinder) {
+                ref.set(IBroker.Stub.asInterface(service))
+                latch.countDown()
+            }
+            override fun onServiceDisconnected(name: android.content.ComponentName) {
+                broker = null
+            }
+        }, BIND_AUTO_CREATE)
+        if (!latch.await(10, java.util.concurrent.TimeUnit.SECONDS) || ref.get() == null) error("broker")
+        broker = ref.get()
+        return ref.get()
     }
 
     private fun displayName(uri: Uri): String {

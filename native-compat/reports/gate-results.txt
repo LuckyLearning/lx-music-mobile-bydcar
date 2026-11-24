@@ -123,6 +123,17 @@ PASS car controls stay during the idle window
 PASS car controls hide at 5 seconds
 PASS open settings pause the car idle timeout
 PASS closing settings restarts the idle timeout
+PASS kg search keeps the parent and skips the group row
+PASS kg name, singers, qualities and duration match the sdk
+PASS kg search url is https on songsearch.kugou.com
+PASS kw search body with SHOW 0 is not a result
+PASS kw search body parses through the existing row parser
+PASS tx parser keeps media id and skips empty sizes
+PASS wy parser follows the maxbr fallthrough and reverses
+PASS mg parser reads the nested result list
+PASS lyric cue parses minutes and fractions
+PASS lyric cue stays on the earlier line
+PASS lyric cue advances at the next stamp
 INFO watchdog exit=137 elapsedMs=413
 PASS parent watchdog kills a silent child
 PASS runner stays up before setup
@@ -163,4 +174,6 @@ PASS infinite loop exits 70
 PASS memory limit exits 70
 PASS child watchdog exits 72 while the parent is silent
 PASS live https://example.com returns a public address and the example page
+PASS kg https search parsed public tracks
+INFO kw live not fetched because the connector refuses cleartext
 SUMMARY failed=0

@@ -87,6 +87,7 @@ fun main(args: Array<String>) {
     kwTests()
     windowTests()
     playerRuleTests()
+    catalogTests()
     check("parent watchdog kills a silent child", watchdogKillsSleep(), "")
     if (!runner.isFile) {
         check("sandbox runner exists", false, runner.path)
@@ -94,6 +95,7 @@ fun main(args: Array<String>) {
         sandboxTests(runner, preload)
     }
     liveExample()
+    liveCatalog()
     println("SUMMARY failed=$failed")
     log.append("SUMMARY failed=$failed\n")
     val reportDir = File("reports")
@@ -641,6 +643,70 @@ private fun sandboxTests(runner: File, preload: File) {
         var stopped = false
         try { box.eval("lx.utils.crypto.md5('abc')") } catch (e: SandboxException) { stopped = true }
         check("child watchdog exits 72 while the parent is silent", stopped && box.exitCode() == 72, "exit=${box.exitCode()} stderr=${box.stderrText()}")
+    }
+}
+
+private fun catalogTests() {
+    val kg = Json.parse("""{"error_code":0,"data":{"total":2,"lists":[{"Audioid":7,"FileHash":"AAA","FileSize":128000,"HQFileSize":0,"SQFileSize":4000000,"ResFileSize":0,"OriSongName":"Song &amp; Name","Suffix":"Live","Singers":[{"name":"A"},{"name":"B"}],"AlbumName":"Al","Duration":125,"Grp":[{"Audioid":8,"FileHash":"BBB","FileSize":1000,"OriSongName":"Child","Singers":[],"AlbumName":"","Duration":1}]}]}}""")
+    val page = KgCatalog.parse(kg)
+    check("kg search keeps the parent and skips the group row", page != null && page.tracks.size == 1 && page.total == 2)
+    val track = page!!.tracks[0]
+    check("kg name, singers, qualities and duration match the sdk", track.name == "Song & Name Live" && track.singer == "A、B" && track.qualities == listOf("128k", "flac") && track.interval == "02:05" && track.songmid == "7", track.toString())
+    check("kg search url is https on songsearch.kugou.com", KgCatalog.searchUrl("你好", 1, 10).startsWith("https://songsearch.kugou.com/song_search_v2?keyword="))
+    val hidden = KwSearch.parseBody(mapOf("TOTAL" to "3", "SHOW" to "0", "abslist" to emptyList<Any>()))
+    check("kw search body with SHOW 0 is not a result", hidden == null)
+    val kw = KwSearch.parseBody(Json.parse("""{"TOTAL":"1","SHOW":"1","abslist":[{"MUSICRID":"MUSIC_9","N_MINFO":"level:h,bitrate:128,format:mp3,size:1.0M;level:s,bitrate:320,format:mp3,size:3.0M","SONGNAME":"N","ARTIST":"S","ALBUM":"A","DURATION":"61"}]}"""))
+    check("kw search body parses through the existing row parser", kw != null && kw[0].songmid == "9" && kw[0].qualities == listOf("320k", "128k") && kw[0].interval == "01:01", kw.toString())
+    val tx = TxCatalog.parseSongs(listOf(mapOf(
+        "title" to "T", "mid" to "m1", "interval" to 90,
+        "singer" to listOf(mapOf("name" to "Q")),
+        "album" to mapOf("name" to "QA", "mid" to "am"),
+        "file" to mapOf("media_mid" to "f1", "size_128mp3" to 10, "size_320mp3" to 0, "size_flac" to 20, "size_hires" to 0),
+    )))
+    check("tx parser keeps media id and skips empty sizes", tx.size == 1 && tx[0].songmid == "m1" && tx[0].qualities == listOf("128k", "flac") && tx[0].singer == "Q")
+    val wy = WyCatalog.parseResources(listOf(mapOf(
+        "baseInfo" to mapOf("simpleSongData" to mapOf(
+            "name" to "W", "id" to 42, "dt" to 180000,
+            "privilege" to mapOf("maxbr" to 320000, "maxBrLevel" to "hires"),
+            "ar" to listOf(mapOf("name" to "WY")),
+            "al" to mapOf("name" to "WA"),
+        )),
+    )))
+    check("wy parser follows the maxbr fallthrough and reverses", wy != null && wy[0].qualities == listOf("128k", "320k", "flac24bit") && wy[0].interval == "03:00" && wy[0].songmid == "42")
+    val mg = MgCatalog.parseResultList(listOf(listOf(mapOf(
+        "songId" to "s", "copyrightId" to "c", "name" to "M", "album" to "MA", "duration" to 40,
+        "singerList" to listOf(mapOf("name" to "MG")),
+        "audioFormats" to listOf(mapOf("formatType" to "PQ"), mapOf("formatType" to "ZQ24")),
+    ))))
+    check("mg parser reads the nested result list", mg.size == 1 && mg[0].qualities == listOf("128k", "flac24bit") && mg[0].interval == "00:40")
+    val lines = LyricCue.parse("[00:01.50]one\n[00:03]two\nplain")
+    check("lyric cue parses minutes and fractions", lines.size == 2 && lines[0].timeMs == 1500L && lines[1].timeMs == 3000L)
+    check("lyric cue stays on the earlier line", LyricCue.current(lines, 2000)?.text == "one")
+    check("lyric cue advances at the next stamp", LyricCue.current(lines, 3000)?.text == "two")
+}
+
+private fun liveCatalog() {
+    val policy = NetworkPolicy(resolve = { host -> InetAddress.getAllByName(host).mapNotNull { it.hostAddress } })
+    val kg = KgCatalog.live(policy, "hello")
+    if (kg.clientError != null) {
+        check("kg https search did not fail inside the client", false, "${kg.clientError} status=${kg.status}")
+    } else if (kg.upstream) {
+        log.append("INFO kg live upstream status=${kg.status}\n")
+        println("INFO kg live upstream status=${kg.status}")
+    } else {
+        check("kg https search parsed public tracks", (kg.page?.tracks?.size ?: 0) > 0, "status=${kg.status} tracks=${kg.page?.tracks?.size} total=${kg.page?.total}")
+    }
+    val kw = KwSearch.live("hello")
+    if (kw.clientError == "TransportException") {
+        log.append("INFO kw live not fetched because the connector refuses cleartext\n")
+        println("INFO kw live not fetched because the connector refuses cleartext")
+    } else if (kw.clientError != null) {
+        check("kw scoped cleartext search did not fail inside the client", false, "${kw.clientError} status=${kw.status}")
+    } else if (kw.upstream) {
+        log.append("INFO kw live upstream status=${kw.status}\n")
+        println("INFO kw live upstream status=${kw.status}")
+    } else {
+        check("kw scoped cleartext search parsed public tracks", (kw.page?.tracks?.size ?: 0) > 0, "status=${kw.status}")
     }
 }
 
