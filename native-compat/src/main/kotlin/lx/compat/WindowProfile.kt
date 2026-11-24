@@ -6,6 +6,7 @@ package lx.compat
  * single 30/70 pair. They are not measurements from a car.
  */
 object WindowProfile {
+    @JvmStatic
     fun classify(widthPx: Int, heightPx: Int, density: Float): String {
         if (density <= 0f || widthPx <= 0 || heightPx <= 0) return "unknown"
         val widthDp = widthPx / density

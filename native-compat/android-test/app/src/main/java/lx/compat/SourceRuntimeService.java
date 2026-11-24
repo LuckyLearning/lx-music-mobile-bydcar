@@ -10,12 +10,48 @@ import java.io.File;
  * Isolated runtime. exported=false and isolatedProcess=true are in the manifest.
  * This process does not receive a policy object and cannot open the broker's allowlist.
  */
-public class SourceRuntimeService extends Service {
+public class SourceRuntimeService extends Service implements GateNative.NativeCallback {
     private int generation = 1;
     private int droppedLate = 0;
     private volatile boolean running = false;
+    private long session;
+    private IScriptHost parent;
+
+    @Override
+    public String rpc(String message) {
+        IScriptHost host = parent;
+        if (host == null) return "{\"ok\":false}";
+        try {
+            return host.handle(message);
+        } catch (Exception e) {
+            return "{\"ok\":false}";
+        }
+    }
 
     private final ISourceRuntime.Stub binder = new ISourceRuntime.Stub() {
+        @Override
+        public void setHost(IScriptHost host) {
+            parent = host;
+            if (session != 0) {
+                GateNative.sessionClose(session);
+                session = 0;
+            }
+            session = GateNative.sessionOpen(SourceRuntimeService.this);
+        }
+
+        @Override
+        public String command(String commandJson) {
+            if (session == 0) return "{\"op\":\"result\",\"id\":0,\"ok\":false,\"error\":\"rejected\"}";
+            running = true;
+            Thread killer = startKiller(12000);
+            try {
+                return GateNative.sessionCommand(session, commandJson);
+            } finally {
+                running = false;
+                killer.interrupt();
+            }
+        }
+
         @Override
         public int eval(int gen, String source, int memoryBytes, int cpuMs) {
             if (gen != generation) {
@@ -44,6 +80,11 @@ public class SourceRuntimeService extends Service {
         @Override
         public int pid() {
             return Process.myPid();
+        }
+
+        @Override
+        public String loadedAbi() {
+            return AbiProbe.loadedLibraryAbi();
         }
 
         @Override
@@ -103,5 +144,14 @@ public class SourceRuntimeService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return binder;
+    }
+
+    @Override
+    public void onDestroy() {
+        if (session != 0) {
+            GateNative.sessionClose(session);
+            session = 0;
+        }
+        super.onDestroy();
     }
 }

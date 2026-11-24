@@ -95,6 +95,12 @@ object LegacyRequest {
         return out.toString()
     }
 
+    /** JSON shape left after the old RN bridge stringified a Buffer and QuickJS parsed it. */
+    fun binaryScriptBody(bytes: ByteArray): Map<String, Any?> {
+        if (bytes.size > 262_144) throw TransportException("body limit")
+        return linkedMapOf("type" to "Buffer", "data" to bytes.map { it.toInt() and 255 })
+    }
+
     fun jsString(value: Any?): String = when (value) {
         null -> "null"
         is String -> value

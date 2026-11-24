@@ -17,6 +17,6 @@
             android:id="@+id/run_probe"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Run isolated probe" />
+            android:text="重新检测" />
     </LinearLayout>
 </ScrollView>

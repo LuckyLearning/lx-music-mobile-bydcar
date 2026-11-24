@@ -9,6 +9,7 @@ if(NOT DEFINED QUICKJS_DIR)
 endif()
 add_library(lxgate SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../runtime/jni_gate.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../runtime/android_session.c
     ${QUICKJS_DIR}/quickjs.c
     ${QUICKJS_DIR}/dtoa.c
     ${QUICKJS_DIR}/libregexp.c

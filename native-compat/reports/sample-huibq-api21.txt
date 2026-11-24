@@ -1,0 +1,17 @@
+Reviewed sample run inside the isolated process. API 21 x86 emulator (ro.product.cpu.abi was x86 on this emulator). Not arm64. Not a phone. Not a successful media URL.
+
+Script: pdone/lx-music-source huibq/1.2.0.js
+Git blob f2028068db448a9e0b738106112eb300bcefbcc2
+SHA-256 a9adeb456690b523008038224091cee31977606302d79082eb06adb3c75c9146
+bytes 2727
+@version v1.2.0
+Request sent by the test: musicUrl, source kw, quality 128k, song id 0.
+The script text and its request header were not written into this report.
+
+Trace from the isolated session:
+init status=true sources=kw,kg,tx,wy,mg
+http host=lxmusicapi.onrender.com method=GET
+http-result host=lxmusicapi.onrender.com status=503 bytes=256
+script-response status=false error=unknow error urlHost=null
+
+Classification: upstream failure. The client completed a mediated HTTPS GET and gave the body to the script. The service returned HTTP 503, and the script took its non-numeric-code path ("unknow error"). This is not a client incompatibility and not a playable URL.

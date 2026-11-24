@@ -5,8 +5,8 @@ import java.io.ByteArrayInputStream
 import java.io.Closeable
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.security.cert.X509Certificate
 import java.util.zip.GZIPInputStream
-import javax.net.ssl.SNIHostName
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
@@ -248,6 +248,51 @@ class PinnedHttps(
     }
 }
 
+private fun applyServerName(ssl: SSLSocket, host: String) {
+    val params = ssl.sslParameters
+    try {
+        val sni = Class.forName("javax.net.ssl.SNIHostName").getConstructor(String::class.java).newInstance(host)
+        params.javaClass.getMethod("setServerNames", List::class.java).invoke(params, listOf(sni))
+    } catch (_: Exception) {
+        try {
+            ssl.javaClass.getMethod("setHostname", String::class.java).invoke(ssl, host)
+        } catch (_: Exception) {
+        }
+    }
+    try {
+        params.javaClass.getMethod("setEndpointIdentificationAlgorithm", String::class.java).invoke(params, "HTTPS")
+    } catch (_: Exception) {
+    }
+    try {
+        ssl.sslParameters = params
+    } catch (_: Exception) {
+    }
+}
+
+private fun verifyPeerName(ssl: SSLSocket, host: String) {
+    val cert = ssl.session.peerCertificates.firstOrNull() as? X509Certificate ?: throw TransportException("certificate")
+    cert.checkValidity()
+    val names = ArrayList<String>()
+    try {
+        for (san in cert.subjectAlternativeNames ?: emptyList()) {
+            if (san.size >= 2 && san[0] == 2) names.add(san[1].toString())
+        }
+    } catch (_: Exception) {
+    }
+    if (names.isEmpty()) {
+        val cn = Regex("CN=([^,]+)").find(cert.subjectX500Principal.name)?.groupValues?.get(1)
+        if (cn != null) names.add(cn)
+    }
+    if (names.none { hostMatches(it, host) }) throw TransportException("hostname")
+}
+
+private fun hostMatches(pattern: String, host: String): Boolean {
+    if (pattern.equals(host, ignoreCase = true)) return true
+    if (!pattern.startsWith("*.")) return false
+    val suffix = pattern.substring(1)
+    return host.length > suffix.length && host.endsWith(suffix, ignoreCase = true) && !host.dropLast(suffix.length).contains('.')
+}
+
 object TlsConnector : Connector {
     override fun open(host: String, ip: String, port: Int, tls: Boolean, timeoutMs: Int): ByteConn {
         if (!tls || port != 443) throw TransportException("tls required")
@@ -256,11 +301,10 @@ object TlsConnector : Connector {
         tcp.connect(InetSocketAddress(ip, 443), timeoutMs)
         tcp.soTimeout = timeoutMs
         val ssl = (SSLSocketFactory.getDefault() as SSLSocketFactory).createSocket(tcp, host, 443, true) as SSLSocket
-        val params = ssl.sslParameters
-        params.serverNames = listOf(SNIHostName(host))
-        params.endpointIdentificationAlgorithm = "HTTPS"
-        ssl.sslParameters = params
+        // Reflection keeps API 21 from linking SNIHostName (API 24) while JDK still sends SNI.
+        applyServerName(ssl, host)
         ssl.startHandshake()
+        verifyPeerName(ssl, host)
         return object : ByteConn {
             override val peerIp = ip
             override fun writeFully(bytes: ByteArray) {

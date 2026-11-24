@@ -102,7 +102,7 @@ PASS phone portrait
 PASS planned byd full width
 PASS planned byd 70 percent pane
 PASS planned byd 30 percent pane
-INFO watchdog exit=137 elapsedMs=426
+INFO watchdog exit=137 elapsedMs=412
 PASS parent watchdog kills a silent child
 PASS runner stays up before setup
 PASS lx version env and script info

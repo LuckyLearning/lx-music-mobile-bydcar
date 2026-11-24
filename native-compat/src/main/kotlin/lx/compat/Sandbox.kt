@@ -298,15 +298,9 @@ class ScriptSandbox(
         }
     }
 
-    /** JSON shape of a Node/RN Buffer after the old bridge's JSON.stringify + JSON.parse. Unsigned bytes. */
-    internal fun bufferValue(bytes: ByteArray): Map<String, Any?> {
-        if (bytes.size > 262_144) throw TransportException("body limit")
-        return linkedMapOf("type" to "Buffer", "data" to bytes.map { it.toInt() and 255 })
-    }
-
     private fun scriptResponse(prepared: LegacyRequest.Prepared, exchange: Exchange): Map<String, Any?> {
         val body: Any? = if (prepared.binary) {
-            bufferValue(exchange.body)
+            LegacyRequest.binaryScriptBody(exchange.body)
         } else {
             val text = exchange.body.toString(Charsets.UTF_8)
             try {
