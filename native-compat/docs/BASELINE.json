@@ -1,0 +1,9 @@
+{
+  "remoteAuditSha": "ad77216fdb3d195072cdddbe687006715971ecad",
+  "localBaseSha": "2571ea373c2ab811dbb6834bf5cdd42a0d624291",
+  "tree": "d48c9ebb8fd79f926e7ed4c325f98bbbf32aba56",
+  "preloadPath": "android/app/src/main/assets/script/user-api-preload.js",
+  "preloadSha256": "e0e892ea9472e190aef6f16996ebcd6bec077f7d8659ceb87a30830d8a53fe41",
+  "preloadBytes": 21341,
+  "status": "partial-uncommitted-handoff; gate NOT PASSED"
+}

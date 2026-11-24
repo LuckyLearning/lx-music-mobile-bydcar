@@ -1,0 +1,6 @@
+artifacts/
+*.class
+*.jar
+*.so
+*.apk
+.local/

@@ -1,0 +1,116 @@
+PASS json keeps bmp and emoji
+PASS json stringify roundtrip
+PASS integral doubles stringify as integers
+PASS duplicate JSON keys are rejected
+PASS json depth is bounded
+PASS json size is bounded
+PASS json trailing junk is rejected
+PASS base64 matches jdk encoder
+PASS base64 roundtrip
+PASS signed byte json
+PASS str2b64 is utf-8
+PASS md5 of a
+PASS md5 url-decodes percent
+PASS md5 url-decodes plus
+PASS md5 bad percent is empty
+PASS aes-cbc pkcs7 matches jdk pkcs5
+PASS aes iv is zero-padded to 16
+PASS aes mode AES with empty iv is ecb
+PASS aes ecb alias with an iv returns empty
+PASS aes bad key returns empty
+PASS rsa nopadding matches jca
+PASS rsa oaep matches jca
+PASS rsa unknown padding is empty
+PASS utility quota is not swallowed
+PASS pending cap does not consume the lifetime cap
+PASS cancel removes the ticket
+PASS lifetime cap remains after a rejected begin
+PASS late completion removes the ticket
+PASS reset makes an old ticket stale
+PASS unknown cancel is false
+PASS playback https is admitted
+PASS playback cleartext is rejected
+PASS late ticket key is retained until completion
+PASS public ipv4
+PASS loopback rejected
+PASS rfc1918 rejected
+PASS link local and metadata rejected
+PASS cgnat rejected
+PASS documentation ipv4 rejected
+PASS multicast rejected
+PASS ipv6 loopback rejected
+PASS documentation ipv6 rejected
+PASS global ipv6 accepted
+PASS mapped ipv4 text is not parsed
+PASS leading zero ipv4 is not parsed
+PASS policy rejects cleartext
+PASS policy rejects loopback literal
+PASS policy rejects header injection
+PASS form body uses encodeURIComponent
+PASS form content type
+PASS json body is stringified
+PASS missing exact Content-Type still json-stringifies
+PASS formData is rejected
+PASS GET body is rejected
+PASS connector refuses private pins
+PASS connector refuses private pins
+PASS redirect is followed to the pinned second address
+PASS chunked body is reassembled
+PASS connector refuses private pins
+PASS redirect to a private address is not opened
+PASS mixed public and loopback answers are refused
+PASS connector refuses private pins
+PASS gzip body is inflated under the cap
+PASS connector refuses private pins
+PASS gzip expansion stops at the body cap
+PASS business success before 20s
+PASS business timeout message
+PASS result after deadline reports timeout once
+PASS source update fails pending requests
+PASS preload fixture matches the app asset
+PASS user-api sources are the mobile set
+PASS online script actions are musicUrl
+PASS lx identity stays mobile 2.0.0
+PASS built-in sdk owns search
+PASS xm is not an active built-in source id
+PASS outer bridge timeout is 20s and cancel hook is empty
+PASS formData branch reads form
+PASS default http timeout is 13s
+INFO watchdog exit=137 elapsedMs=418
+PASS parent watchdog kills a silent child
+PASS runner stays up before setup
+PASS lx version env and script info
+PASS hostile globals and dynamic code are absent
+PASS console output is not copied out
+PASS native entry rejects the wrong key
+PASS script exception is rejected without the message
+PASS init status
+PASS kw intersection drops lyric search and hires
+PASS kg keeps the quality intersection
+PASS local actions stay and online qualities do not apply
+PASS xm and non-music tx are absent
+PASS musicUrl https is accepted by preload
+PASS preload still accepts a cleartext musicUrl string
+PASS playback policy still rejects that cleartext string
+PASS lyric boundaries match preload
+PASS request before on() fails closed
+PASS init runs after on() microtasks
+PASS request handler microtask is ordered before the response is observed
+PASS response event exists
+PASS both timers were posted
+PASS cleared timer does not run when the native timer still fires
+PASS remaining timer runs
+PASS second cancel throws and the host reports one cancellation
+PASS formData never reaches the network
+PASS script http json is parsed and the host saw the body
+PASS private resolution does not call the transport
+PASS preload utf-8 quirk keeps the 3-byte decoder
+PASS preload utf-8 still decodes BMP
+PASS preload md5 encodes then the host decodes
+PASS update alert is once and a short invalid url is kept
+PASS binary response reaches the script as base64, not a Buffer
+PASS infinite loop exits 70
+PASS memory limit exits 70
+PASS child watchdog exits 72 while the parent is silent
+PASS live https://example.com returns a public address and the example page
+SUMMARY failed=0

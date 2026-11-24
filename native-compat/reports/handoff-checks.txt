@@ -1,0 +1,41 @@
+CHECK: Compile existing Kotlin core (not API21/Android validation)
+COMMAND: java -cp /workspace/lx-native-tools/kotlin/* org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect -classpath /workspace/lx-native-tools/kotlin/kotlin-stdlib-2.1.20.jar:/workspace/lx-native-tools/kotlin/annotations-13.0.jar -jvm-target 1.8 /workspace/lx-native-compat-20261124/native-compat/src/main/kotlin/lx/compat/Crypto.kt /workspace/lx-native-compat-20261124/native-compat/src/main/kotlin/lx/compat/Json.kt /workspace/lx-native-compat-20261124/native-compat/src/main/kotlin/lx/compat/NetworkPolicy.kt -d /workspace/lx-native-compat-20261124/native-compat/artifacts/compat-core.jar
+EXIT: 0
+ELAPSED_HOST_SECONDS: 4.071
+
+
+CHECK: Compile final existing host C runner
+COMMAND: cc -O2 -D_GNU_SOURCE -DCONFIG_VERSION="2026-06-04" -I/workspace/lx-native-tools/quickjs-2026-06-04 /workspace/lx-native-compat-20261124/native-compat/runtime/runner.c /workspace/lx-native-tools/quickjs-2026-06-04/quickjs.c /workspace/lx-native-tools/quickjs-2026-06-04/dtoa.c /workspace/lx-native-tools/quickjs-2026-06-04/libregexp.c /workspace/lx-native-tools/quickjs-2026-06-04/libunicode.c /workspace/lx-native-tools/quickjs-2026-06-04/cutils.c -lm -lpthread -o /workspace/lx-native-compat-20261124/native-compat/artifacts/gate-runner
+EXIT: 0
+ELAPSED_HOST_SECONDS: 15.956
+
+
+CHECK: synthetic globals and Promise job
+COMMAND: /usr/bin/bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL --clearenv --ro-bind /usr /usr --ro-bind /lib /lib --ro-bind /lib64 /lib64 --proc /proc --dev /dev --ro-bind /workspace/lx-native-compat-20261124/native-compat/artifacts/gate-runner /runner --ro-bind /tmp/lx-gate-smoke-wiy0dvtp/synthetic.js /bundle.js /runner /bundle.js
+EXIT: 0
+ELAPSED_HOST_SECONDS: 0.016
+{"kind":"isolation","seccomp":true,"memoryLimit":33554432}
+{"kind":"ready"}
+
+
+EXPECT_EXIT: 0; ISOLATION_RECORD: True; SMOKE_PASS: True
+CHECK: synthetic infinite-loop interrupt
+COMMAND: /usr/bin/bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL --clearenv --ro-bind /usr /usr --ro-bind /lib /lib --ro-bind /lib64 /lib64 --proc /proc --dev /dev --ro-bind /workspace/lx-native-compat-20261124/native-compat/artifacts/gate-runner /runner --ro-bind /tmp/lx-gate-smoke-6x4hltjt/synthetic.js /bundle.js /runner /bundle.js
+EXIT: 70
+ELAPSED_HOST_SECONDS: 2.007
+{"kind":"isolation","seccomp":true,"memoryLimit":33554432}
+
+JS execution rejected (details redacted)
+
+EXPECT_EXIT: 70; ISOLATION_RECORD: True; SMOKE_PASS: True
+CHECK: synthetic memory bound
+COMMAND: /usr/bin/bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL --clearenv --ro-bind /usr /usr --ro-bind /lib /lib --ro-bind /lib64 /lib64 --proc /proc --dev /dev --ro-bind /workspace/lx-native-compat-20261124/native-compat/artifacts/gate-runner /runner --ro-bind /tmp/lx-gate-smoke-ccsj5566/synthetic.js /bundle.js /runner /bundle.js
+EXIT: 70
+ELAPSED_HOST_SECONDS: 0.022
+{"kind":"isolation","seccomp":true,"memoryLimit":33554432}
+
+JS execution rejected (details redacted)
+
+EXPECT_EXIT: 70; ISOLATION_RECORD: True; SMOKE_PASS: True
+SUMMARY: compiler exits and 3 host-only smoke checks above; NOT a script-host contract regression suite.
+No third-party source executed; no source network requests; no Android build/device/ABI/API21 test; compatibility gate NOT PASSED.
