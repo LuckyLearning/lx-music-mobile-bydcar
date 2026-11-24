@@ -46,6 +46,9 @@ class PlayerActivity : Activity() {
     private var broker: IBroker? = null
     private var lyricSource = "还没有歌词。可以打开一个文本歌词，字号最小是 1，没有上限。"
     private var lyricCues: List<LyricCue.Line> = emptyList()
+    private var searchHits: List<Map<String, Any?>> = emptyList()
+    private var searchQuality = "128k"
+    private var floating: FloatingLyric? = null
 
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
@@ -182,7 +185,10 @@ class PlayerActivity : Activity() {
             button("打开音频") { openAudio() },
             button("测试音") { addTone() },
             button("酷狗搜索") { searchKg() },
+            button("播放搜索") { playSearch() },
+            button("换音质") { cycleSearchQuality() },
             button("播放样本") { playReviewedSample() },
+            button("桌面歌词") { toggleFloating() },
             button("歌词") { openLyric() },
             button("重试") { controller?.let { it.prepare(); it.play() } },
             button("设置") { toggleSettings() },
@@ -243,7 +249,7 @@ class PlayerActivity : Activity() {
         bindStep(smaller, -1)
         bindStep(larger, 1)
         panel.addView(row(smaller, larger))
-        panel.addView(text("酷狗搜索走 HTTPS。播放地址只接受已审核脚本返回的 HTTPS。QQ、网易的签名请求还没迁。酷我搜索是明文，这里不直接打开。", 13f))
+        panel.addView(text("酷狗搜索和播放地址都走 HTTPS。换音质会改用对应哈希再请求；上游返回的码率以结果为准。QQ、网易签名请求还没迁。", 13f))
         return panel
     }
 
@@ -412,6 +418,37 @@ class PlayerActivity : Activity() {
             val line = LyricCue.current(lyricCues, pos)?.text ?: lyricSource
             if (lyric.text.toString() != line) lyric.text = line
         }
+        val overlay = floating
+        if (overlay != null && overlay.visible()) {
+            val line = if (lyricCues.isNotEmpty()) LyricCue.current(lyricCues, pos)?.text ?: lyricSource else lyric.text.toString()
+            try {
+                overlay.show(line)
+            } catch (_: RuntimeException) {
+                floating = null
+            }
+        }
+    }
+
+    private fun toggleFloating() {
+        val current = floating
+        if (current != null && current.visible()) {
+            try {
+                current.hide()
+            } catch (_: RuntimeException) {
+            }
+            floating = null
+            queue.text = "桌面歌词已关闭"
+            return
+        }
+        val created = FloatingLyric(this)
+        try {
+            created.show(if (lyricCues.isNotEmpty()) LyricCue.current(lyricCues, controller?.currentPosition ?: 0)?.text ?: lyricSource else lyric.text.toString())
+            floating = created
+            queue.text = "桌面歌词已打开"
+        } catch (_: RuntimeException) {
+            queue.text = "系统没有允许桌面歌词窗口"
+            floating = null
+        }
     }
 
     private fun togglePlay() {
@@ -560,15 +597,89 @@ class PlayerActivity : Activity() {
             return
         }
         val rows = root["tracks"]?.list() ?: emptyList()
-        if (rows.isEmpty()) {
+        searchHits = rows.mapNotNull { it?.obj() }
+        if (searchHits.isEmpty()) {
             queue.text = "酷狗没有解析出曲目"
             return
         }
-        queue.text = rows.mapIndexed { index, row ->
-            val item = row.obj()
+        searchQuality = "128k"
+        queue.text = searchHits.mapIndexed { index, item ->
             val qualities = (item["qualities"]?.list() ?: emptyList()).mapNotNull { it as? String }
             (index + 1).toString() + ". " + item["name"].strOrNull().orEmpty() + " — " + item["singer"].strOrNull().orEmpty() + "  " + qualities.joinToString("/")
-        }.joinToString("\n") + "\n这些结果还没有播放地址。只有已审核脚本返回 HTTPS 时才会播放。"
+        }.joinToString("\n") + "\n点「播放搜索」会向酷狗要第一条的 HTTPS 地址。当前音质 " + searchQuality + "。"
+    }
+
+    private fun cycleSearchQuality() {
+        val order = listOf("128k", "320k", "flac", "flac24bit")
+        val hashes = searchHits.firstOrNull()?.get("hashes")?.obj() ?: emptyMap()
+        val available = order.filter { hashes[it] is String }
+        if (available.isEmpty()) {
+            queue.text = "还没有可切换音质的搜索结果"
+            return
+        }
+        val next = available[(available.indexOf(searchQuality) + 1).mod(available.size)]
+        searchQuality = next
+        playSearch()
+    }
+
+    private fun playSearch() {
+        val hit = searchHits.firstOrNull()
+        if (hit == null) {
+            queue.text = "先搜索，再播放第一条"
+            return
+        }
+        val hashes = hit["hashes"]?.obj() ?: emptyMap()
+        val hash = hashes[searchQuality].strOrNull() ?: hashes.values.firstOrNull().strOrNull()
+        if (hash.isNullOrEmpty()) {
+            queue.text = "这条没有可用的音质哈希"
+            return
+        }
+        val requested = if (hashes[searchQuality] is String) searchQuality else "128k"
+        queue.text = "正在向酷狗要 " + requested + " 的播放地址"
+        Thread {
+            val json = try {
+                ensureBroker().playKg(hash, requested)
+            } catch (_: Exception) {
+                "{\"error\":\"broker\",\"https\":false}"
+            }
+            handler.post { playKgResult(json, hit["name"].strOrNull() ?: "酷狗", requested) }
+        }.start()
+    }
+
+    private fun playKgResult(json: String, title: String, requested: String) {
+        val root = try {
+            Json.parse(json).obj()
+        } catch (_: RuntimeException) {
+            queue.text = "播放地址没有解析出来"
+            return
+        }
+        if (root["upstream"] == true || root["https"] != true) {
+            queue.text = "酷狗没有返回可播放的 HTTPS 地址。状态 " + root["status"] + "。这不是兼容通过。"
+            return
+        }
+        val url = root["url"].strOrNull()
+        val host = root["host"].strOrNull() ?: ""
+        if (url.isNullOrEmpty() || !host.endsWith("kugou.com")) {
+            queue.text = "播放地址的主机不在允许范围内"
+            return
+        }
+        try {
+            PlayerTransportPolicy().decide(url)
+        } catch (_: PolicyRejected) {
+            queue.text = "播放策略拒绝了这个地址"
+            return
+        }
+        val current = controller
+        if (current == null) {
+            queue.text = "播放服务还没有连上"
+            return
+        }
+        val bitrate = (root["bitrate"] as? Number)?.toInt() ?: 0
+        current.addMediaItem(item("kg-" + requested, title, Uri.parse(url)))
+        current.seekTo(current.mediaItemCount - 1, 0)
+        current.prepare()
+        current.play()
+        queue.text = "已加入队列。请求 " + requested + "，上游返回 " + bitrate + "kbps。主机 " + host + "。"
     }
 
     private fun playReviewedSample() {

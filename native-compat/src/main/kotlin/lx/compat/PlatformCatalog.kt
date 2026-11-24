@@ -21,6 +21,7 @@ data class CatalogTrack(
     val albumName: String,
     val interval: String,
     val qualities: List<String>,
+    val hashes: Map<String, String> = emptyMap(),
 )
 
 data class CatalogPage(val tracks: List<CatalogTrack>, val total: Int, val source: String)
@@ -95,14 +96,22 @@ object KgCatalog {
         return CatalogPage(tracks, total, "kg")
     }
 
-    fun live(policy: NetworkPolicy, query: String): LiveSearch = fetch(policy, searchUrl(query, 1, 10), ::parse)
+    fun live(policy: NetworkPolicy, query: String): LiveSearch =
+        fetch(policy, searchUrl(query, 1, 10), ::parse, listOf("user-agent" to "Mozilla/5.0"))
 
     private fun track(item: Map<*, *>): CatalogTrack {
         val qualities = ArrayList<String>()
-        if (long(item["FileSize"]) != 0L) qualities.add("128k")
-        if (long(item["HQFileSize"]) != 0L) qualities.add("320k")
-        if (long(item["SQFileSize"]) != 0L) qualities.add("flac")
-        if (long(item["ResFileSize"]) != 0L) qualities.add("flac24bit")
+        val hashes = linkedMapOf<String, String>()
+        fun keep(quality: String, sizeKey: String, hashKey: String) {
+            if (long(item[sizeKey]) == 0L) return
+            qualities.add(quality)
+            val hash = item[hashKey]?.toString()?.trim().orEmpty()
+            if (hash.matches(Regex("[A-Fa-f0-9]{32}"))) hashes[quality] = hash.lowercase()
+        }
+        keep("128k", "FileSize", "FileHash")
+        keep("320k", "HQFileSize", "HQFileHash")
+        keep("flac", "SQFileSize", "SQFileHash")
+        keep("flac24bit", "ResFileSize", "ResFileHash")
         val suffix = item["Suffix"]?.toString() ?: ""
         val title = (item["OriSongName"]?.toString() ?: "") + if (suffix.isEmpty()) "" else " $suffix"
         return CatalogTrack(
@@ -113,9 +122,54 @@ object KgCatalog {
             albumName = KwCatalog.decodeName(item["AlbumName"]?.toString()),
             interval = KwCatalog.formatPlayTime(long(item["Duration"]).toInt()),
             qualities = qualities,
+            hashes = hashes,
         )
     }
 }
+
+/** Public Kugou song-info lookup. The hash selects the requested quality; the response bitrate is recorded as returned. */
+object KgPlay {
+    const val INFO_HOST = "m.kugou.com"
+
+    data class Playable(val url: String, val host: String, val bitrate: Int, val quality: String)
+
+    fun infoUrl(hash: String): String {
+        require(hash.matches(Regex("[A-Fa-f0-9]{32}")))
+        return "https://$INFO_HOST/app/i/getSongInfo.php?cmd=playInfo&hash=$hash"
+    }
+
+    fun parse(body: Any?, quality: String): Playable? {
+        val root = body as? Map<*, *> ?: return null
+        if ((root["status"] as? Number)?.toInt() != 1) return null
+        val url = root["url"]?.toString() ?: return null
+        if (!url.startsWith("https://") || url.length > 2048) return null
+        val host = try {
+            java.net.URI(url).host?.lowercase()
+        } catch (_: Exception) {
+            null
+        } ?: return null
+        if (!host.endsWith(".kugou.com") && host != "kugou.com") return null
+        if (Addresses.parse(host) != null && !Addresses.isPublic(host)) return null
+        return Playable(url, host, (root["bitRate"] as? Number)?.toInt() ?: 0, quality)
+    }
+
+    fun live(policy: NetworkPolicy, hash: String, quality: String): LivePlay {
+        return try {
+            val exchange = PinnedHttps(policy, TlsConnector).execute(
+                policy.admit(infoUrl(hash), "GET", listOf("user-agent" to "Mozilla/5.0"), null, 8_000, false),
+            )
+            if (exchange.statusCode != 200) return LivePlay(exchange.statusCode, null, true, null)
+            val text = exchange.body.toString(Charsets.UTF_8).trim()
+            if (!text.startsWith("{")) return LivePlay(exchange.statusCode, null, true, null)
+            val playable = parse(Json.parse(text), quality)
+            if (playable == null) LivePlay(exchange.statusCode, null, true, null) else LivePlay(exchange.statusCode, playable, false, null)
+        } catch (e: Exception) {
+            LivePlay(0, null, false, e.javaClass.simpleName)
+        }
+    }
+}
+
+data class LivePlay(val status: Int, val playable: KgPlay.Playable?, val upstream: Boolean, val clientError: String?)
 
 object KwSearch {
     fun parseBody(body: Any?): List<KwCatalog.Track>? {
@@ -251,9 +305,14 @@ object MgCatalog {
 
 internal fun long(value: Any?): Long = (value as? Number)?.toLong() ?: 0L
 
-private fun fetch(policy: NetworkPolicy, url: String, parse: (Any?) -> CatalogPage?): LiveSearch {
+private fun fetch(
+    policy: NetworkPolicy,
+    url: String,
+    parse: (Any?) -> CatalogPage?,
+    headers: List<Pair<String, String>> = emptyList(),
+): LiveSearch {
     return try {
-        val exchange = PinnedHttps(policy, TlsConnector).execute(policy.admit(url, "GET", emptyList(), null, 8_000, false))
+        val exchange = PinnedHttps(policy, TlsConnector).execute(policy.admit(url, "GET", headers, null, 8_000, false))
         classify(exchange.statusCode, exchange.body, parse)
     } catch (e: Exception) {
         LiveSearch(0, null, false, e.javaClass.simpleName)

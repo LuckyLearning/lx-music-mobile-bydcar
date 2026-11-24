@@ -13,9 +13,10 @@ import java.util.concurrent.TimeUnit
 class BrokerService : Service() {
     private val ready = CountDownLatch(1)
     private var runtime: ISourceRuntime? = null
-    private val policy = NetworkPolicy(resolve = { name ->
+    private var resolveDns: (String) -> List<String> = { name ->
         InetAddress.getAllByName(name).mapNotNull { it.hostAddress }
-    })
+    }
+    private val policy = NetworkPolicy(resolve = { name -> resolveDns(name) })
     private val host = AndroidHost(policy)
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
@@ -49,6 +50,7 @@ class BrokerService : Service() {
                     "songmid" to track.songmid.take(64),
                     "interval" to track.interval,
                     "qualities" to track.qualities,
+                    "hashes" to track.hashes,
                 )
             } ?: emptyList()
             return Json.stringify(mapOf(
@@ -75,6 +77,32 @@ class BrokerService : Service() {
                 "rejected"
             }
             return Json.stringify(mapOf("url" to url, "admitted" to admitted, "trace" to trace))
+        }
+
+        override fun playKg(hash: String, quality: String): String {
+            if (!hash.matches(Regex("[A-Fa-f0-9]{32}"))) return "{\"error\":\"hash\",\"upstream\":false,\"status\":0,\"https\":false}"
+            val live = KgPlay.live(policy, hash, quality)
+            val playable = live.playable
+            return Json.stringify(mapOf(
+                "status" to live.status,
+                "upstream" to live.upstream,
+                "error" to live.clientError,
+                "https" to (playable != null),
+                "host" to playable?.host,
+                "bitrate" to (playable?.bitrate ?: 0),
+                "quality" to quality,
+                "url" to playable?.url,
+            ))
+        }
+
+        override fun installFixtureResolver(mode: String) {
+            resolveDns = if (mode == "mixed") {
+                { host ->
+                    if (host == "rebind.test") listOf("1.1.1.1", "127.0.0.1") else error("fixture host")
+                }
+            } else {
+                { name -> InetAddress.getAllByName(name).mapNotNull { it.hostAddress } }
+            }
         }
     }
 

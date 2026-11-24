@@ -20,4 +20,10 @@ if [ ! -x ./gradlew ]; then
   "$GRADLE_BIN" wrapper --gradle-version 8.7
 fi
 ./gradlew :app:assembleDebug :app:processDebugMainManifest --no-daemon
-echo "APK $(pwd)/app/build/outputs/apk/debug/app-debug.apk"
+APK="$(pwd)/app/build/outputs/apk/debug/app-debug.apk"
+echo "APK $APK"
+if [ -d /opt/cursor/artifacts ]; then
+  VER="$(sed -n 's/.*versionName "\([^"]*\)".*/\1/p' app/build.gradle | head -n 1)"
+  cp "$APK" "/opt/cursor/artifacts/lx-native-test-${VER:-debug}.apk"
+  echo "ARTIFACT /opt/cursor/artifacts/lx-native-test-${VER:-debug}.apk"
+fi

@@ -647,11 +647,14 @@ private fun sandboxTests(runner: File, preload: File) {
 }
 
 private fun catalogTests() {
-    val kg = Json.parse("""{"error_code":0,"data":{"total":2,"lists":[{"Audioid":7,"FileHash":"AAA","FileSize":128000,"HQFileSize":0,"SQFileSize":4000000,"ResFileSize":0,"OriSongName":"Song &amp; Name","Suffix":"Live","Singers":[{"name":"A"},{"name":"B"}],"AlbumName":"Al","Duration":125,"Grp":[{"Audioid":8,"FileHash":"BBB","FileSize":1000,"OriSongName":"Child","Singers":[],"AlbumName":"","Duration":1}]}]}}""")
+    val kg = Json.parse("""{"error_code":0,"data":{"total":2,"lists":[{"Audioid":7,"FileHash":"0123456789abcdef0123456789abcdef","FileSize":128000,"HQFileSize":0,"SQFileHash":"abcdef0123456789abcdef0123456789","SQFileSize":4000000,"ResFileSize":0,"OriSongName":"Song &amp; Name","Suffix":"Live","Singers":[{"name":"A"},{"name":"B"}],"AlbumName":"Al","Duration":125,"Grp":[{"Audioid":8,"FileHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","FileSize":1000,"OriSongName":"Child","Singers":[],"AlbumName":"","Duration":1}]}]}}""")
     val page = KgCatalog.parse(kg)
     check("kg search keeps the parent and skips the group row", page != null && page.tracks.size == 1 && page.total == 2)
     val track = page!!.tracks[0]
-    check("kg name, singers, qualities and duration match the sdk", track.name == "Song & Name Live" && track.singer == "A、B" && track.qualities == listOf("128k", "flac") && track.interval == "02:05" && track.songmid == "7", track.toString())
+    check("kg name, singers, qualities and duration match the sdk", track.name == "Song & Name Live" && track.singer == "A、B" && track.qualities == listOf("128k", "flac") && track.interval == "02:05" && track.songmid == "7" && track.hashes["128k"] == "0123456789abcdef0123456789abcdef" && track.hashes["flac"] == "abcdef0123456789abcdef0123456789", track.toString())
+    val playable = KgPlay.parse(Json.parse("""{"status":1,"bitRate":128,"url":"https://sharefs.kugou.com/example.mp3"}"""), "128k")
+    check("kg play info keeps an https kugou url and the returned bitrate", playable != null && playable.host == "sharefs.kugou.com" && playable.bitrate == 128 && playable.quality == "128k")
+    check("kg play info rejects cleartext and a failed status", KgPlay.parse(Json.parse("""{"status":1,"bitRate":128,"url":"http://sharefs.kugou.com/a.mp3"}"""), "128k") == null && KgPlay.parse(Json.parse("""{"status":0,"url":"https://sharefs.kugou.com/a.mp3"}"""), "128k") == null)
     check("kg search url is https on songsearch.kugou.com", KgCatalog.searchUrl("你好", 1, 10).startsWith("https://songsearch.kugou.com/song_search_v2?keyword="))
     val hidden = KwSearch.parseBody(mapOf("TOTAL" to "3", "SHOW" to "0", "abslist" to emptyList<Any>()))
     check("kw search body with SHOW 0 is not a result", hidden == null)
@@ -694,7 +697,35 @@ private fun liveCatalog() {
         log.append("INFO kg live upstream status=${kg.status}\n")
         println("INFO kg live upstream status=${kg.status}")
     } else {
-        check("kg https search parsed public tracks", (kg.page?.tracks?.size ?: 0) > 0, "status=${kg.status} tracks=${kg.page?.tracks?.size} total=${kg.page?.total}")
+        val count = kg.page?.tracks?.size ?: 0
+        if (count == 0) {
+            log.append("INFO kg live empty status=${kg.status} total=${kg.page?.total}\n")
+            println("INFO kg live empty status=${kg.status} total=${kg.page?.total}")
+        } else check("kg https search parsed public tracks", true, "status=${kg.status} tracks=$count total=${kg.page?.total}")
+        val hash = if (count == 0) null else kg.page?.tracks?.firstOrNull()?.hashes?.get("128k")
+        if (hash != null) {
+            val play = KgPlay.live(policy, hash, "128k")
+            if (play.clientError != null) {
+                check("kg play info did not fail inside the client", false, play.clientError)
+            } else if (play.upstream || play.playable == null) {
+                log.append("INFO kg play upstream status=${play.status}\n")
+                println("INFO kg play upstream status=${play.status}")
+            } else {
+                val got = play.playable
+                check(
+                    "kg play info returned https audio on kugou",
+                    got.url.startsWith("https://") && got.host.endsWith("kugou.com") && got.bitrate > 0,
+                    "host=${got.host} bitrate=${got.bitrate}",
+                )
+                val hq = kg.page?.tracks?.firstOrNull()?.hashes?.get("320k")
+                if (hq != null && hq != hash) {
+                    val higher = KgPlay.live(policy, hq, "320k")
+                    val rate = higher.playable?.bitrate
+                    log.append("INFO kg hq hash bitrate=$rate status=${higher.status}\n")
+                    println("INFO kg hq hash bitrate=$rate status=${higher.status}")
+                }
+            }
+        }
     }
     val kw = KwSearch.live("hello")
     if (kw.clientError == "TransportException") {

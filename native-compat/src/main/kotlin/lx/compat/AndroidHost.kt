@@ -78,7 +78,7 @@ class AndroidHost(
         payload["id"] = id
         val raw = send(Json.stringify(payload))
         val result = Json.parse(raw).obj()
-        if (result["ok"] != true && result["error"] != null) note("command-rejected op=${fields["op"]}")
+        if (result["ok"] != true && result["error"] != null) note("command-rejected op=${fields["op"]} error=${result["error"]}")
         drain(send)
     }
 

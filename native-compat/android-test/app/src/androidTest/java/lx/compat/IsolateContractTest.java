@@ -42,6 +42,46 @@ public class IsolateContractTest {
         assertFalse(trace.contains("http host="));
     }
 
+    @Test
+    public void isolateFollowsRedirectAndChecksRsa() throws Exception {
+        String script = "var key='MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBANribHS4xXXZR9oWI6110dHtocQLHx29SiM6FpxFGrTVyORumdpoaBszeO0uNk4Tj2GUGMNP0I372E3NNLF/CjMCAwEAAQ==';"
+            + "var out=lx.utils.crypto.rsaEncrypt('hi', key);"
+            + "var hex=lx.utils.buffer.bufToString(out,'hex');"
+            + "var rsaok=hex==='5a15528426dce4a9e7e904fadd9584f603492ddb3b9039b1676be74f1837b1763ad8adb6f09aa815c44bf864bda1a016b5c9802fd4f153e4cb86d343d7789d0d';"
+            + "var redirectOk=false;"
+            + "lx.request('https://httpbingo.org/redirect-to?url=https%3A%2F%2Fexample.com%2F',{timeout:8000},function(err,resp){"
+            + "redirectOk=!err && resp && resp.statusCode==200 && String(resp.body).indexOf('Example Domain')>=0;"
+            + "});"
+            + "lx.on('request', function(){ if(!rsaok || !redirectOk) return Promise.reject(new Error('probe'));"
+            + "return Promise.resolve('https://example.com/a.mp3'); }).then(function(){"
+            + "return lx.send('updateAlert', {log: 'rsa=' + (rsaok ? 'ok' : 'bad')}); }).then(function(){"
+            + "return lx.send('inited', {sources:{kw:{type:'music', actions:['musicUrl'], qualitys:['128k']}}}); });";
+        String request = "{\"requestKey\":\"r1\",\"data\":{\"source\":\"kw\",\"action\":\"musicUrl\",\"info\":{\"type\":\"128k\",\"musicInfo\":{\"songmid\":\"1\"}}}}";
+        String trace = bind().runScript(script, request);
+        assertTrue(trace, trace.contains("alert rsa=ok"));
+        if (trace.contains("http-failed")) return;
+        assertTrue(trace, trace.contains("http host=httpbingo.org"));
+        assertTrue(trace, trace.contains("script-response status=true"));
+    }
+
+    @Test
+    public void isolateRejectsMixedDnsAnswers() throws Exception {
+        IBroker broker = bind();
+        try {
+            broker.installFixtureResolver("mixed");
+            String script = "lx.request('https://rebind.test/x',{timeout:1000},function(){});"
+                + "lx.on('request', function(){ return Promise.resolve('https://example.com/a.mp3'); }).then(function(){"
+                + "return lx.send('inited', {sources:{kw:{type:'music', actions:['musicUrl'], qualitys:['128k']}}}); });";
+            String request = "{\"requestKey\":\"b1\",\"data\":{\"source\":\"kw\",\"action\":\"musicUrl\",\"info\":{\"type\":\"128k\",\"musicInfo\":{\"songmid\":\"1\"}}}}";
+            String trace = broker.runScript(script, request);
+            assertTrue(trace, trace.contains("http-rejected"));
+            assertTrue(trace, trace.contains("Non-public"));
+            assertFalse(trace.contains("http host=rebind.test"));
+        } finally {
+            broker.installFixtureResolver("real");
+        }
+    }
+
     private static IBroker bind() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         CountDownLatch latch = new CountDownLatch(1);
