@@ -86,6 +86,7 @@ fun main(args: Array<String>) {
     sourceTests(root, preload)
     kwTests()
     windowTests()
+    playerRuleTests()
     check("parent watchdog kills a silent child", watchdogKillsSleep(), "")
     if (!runner.isFile) {
         check("sandbox runner exists", false, runner.path)
@@ -380,6 +381,39 @@ private fun kwTests() {
     check("hot playlist tags keep id-digest", tags[0].id == "7-8" && tags[0].name == "热门")
     val groups = KwCatalog.tagGroups(listOf(mapOf("id" to "1", "name" to "主题", "data" to listOf(mapOf("id" to "9", "name" to "夜晚")))))
     check("playlist tag groups keep the parent", groups[0].parentName == "主题" && groups[0].id == "9")
+}
+
+private fun playerRuleTests() {
+    check("lyric step stays at least 1", PlayerRules.stepLrcFontPt(1.0, -5) == 1)
+    check("lyric step has no upper cap", PlayerRules.stepLrcFontPt(400.0, 1) == 401)
+    check("lyric step rounds then clamps", PlayerRules.stepLrcFontPt(1.4, 1) == 2)
+    check("bad lyric value falls back", PlayerRules.normalizeLrcFontPt(Double.NaN, 21) == 21)
+    check("portrait phone stays vertical even in car mode", PlayerRules.selectPlayerLayout(1080, 1920, true) == "vertical")
+    check("wide car window uses car layout", PlayerRules.selectPlayerLayout(1920, 984, true) == "car")
+    check("wide phone without car mode stays horizontal", PlayerRules.selectPlayerLayout(1920, 984, false) == "horizontal")
+    check("dock reserve is not added on top of a system inset", PlayerRules.bottomPaddingPx(true, 48, 1.5f) == 48)
+    check("car mode reserves 56dp only when the inset is zero", PlayerRules.bottomPaddingPx(true, 0, 1.5f) == 84)
+    check("phone does not invent a dock inset", PlayerRules.bottomPaddingPx(false, 0, 1.5f) == 0)
+    check("boot does not play when autostart is off", !PlayerRules.bootShouldStartPlayback(false, true, true))
+    check("boot does not play when launch autoplay is off", !PlayerRules.bootShouldStartPlayback(true, false, true))
+    check("boot does not invent a track", !PlayerRules.bootShouldStartPlayback(true, true, false))
+    check("boot plays only with both switches and a queue", PlayerRules.bootShouldStartPlayback(true, true, true))
+    check("planned car window keeps its pane", PlayerRules.carPane(576, 984, 1.5f) == "car-30")
+    check("short wide window still has a full pane", PlayerRules.carPane(1920, 400, 1.5f) == "car-full")
+    check("narrow window is the 30 percent pane", PlayerRules.carPane(500, 400, 1.5f) == "car-30")
+    val chrome = CarChrome(idleMs = 5_000)
+    chrome.tap(0)
+    chrome.tick(4_999)
+    check("car controls stay during the idle window", chrome.controlsVisible)
+    chrome.tick(5_000)
+    check("car controls hide at 5 seconds", !chrome.controlsVisible)
+    chrome.tap(6_000)
+    chrome.setSettingsOpen(true, 6_100)
+    chrome.tick(20_000)
+    check("open settings pause the car idle timeout", chrome.controlsVisible && chrome.settingsOpen)
+    chrome.setSettingsOpen(false, 20_000)
+    chrome.tick(25_000)
+    check("closing settings restarts the idle timeout", !chrome.controlsVisible)
 }
 
 private fun windowTests() {

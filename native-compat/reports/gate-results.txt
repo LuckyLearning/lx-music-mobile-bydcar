@@ -102,7 +102,28 @@ PASS phone portrait
 PASS planned byd full width
 PASS planned byd 70 percent pane
 PASS planned byd 30 percent pane
-INFO watchdog exit=137 elapsedMs=412
+PASS lyric step stays at least 1
+PASS lyric step has no upper cap
+PASS lyric step rounds then clamps
+PASS bad lyric value falls back
+PASS portrait phone stays vertical even in car mode
+PASS wide car window uses car layout
+PASS wide phone without car mode stays horizontal
+PASS dock reserve is not added on top of a system inset
+PASS car mode reserves 56dp only when the inset is zero
+PASS phone does not invent a dock inset
+PASS boot does not play when autostart is off
+PASS boot does not play when launch autoplay is off
+PASS boot does not invent a track
+PASS boot plays only with both switches and a queue
+PASS planned car window keeps its pane
+PASS short wide window still has a full pane
+PASS narrow window is the 30 percent pane
+PASS car controls stay during the idle window
+PASS car controls hide at 5 seconds
+PASS open settings pause the car idle timeout
+PASS closing settings restarts the idle timeout
+INFO watchdog exit=137 elapsedMs=413
 PASS parent watchdog kills a silent child
 PASS runner stays up before setup
 PASS lx version env and script info
