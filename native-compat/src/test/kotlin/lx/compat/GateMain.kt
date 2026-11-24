@@ -392,6 +392,7 @@ private fun playerRuleTests() {
     check("lyric step rounds then clamps", PlayerRules.stepLrcFontPt(1.4, 1) == 2)
     check("bad lyric value falls back", PlayerRules.normalizeLrcFontPt(Double.NaN, 21) == 21)
     check("portrait phone stays vertical even in car mode", PlayerRules.selectPlayerLayout(1080, 1920, true) == "vertical")
+    check("planned 30 percent pane uses car layout", PlayerRules.selectPlayerLayout(576, 984, true, 1.5f) == "car")
     check("wide car window uses car layout", PlayerRules.selectPlayerLayout(1920, 984, true) == "car")
     check("wide phone without car mode stays horizontal", PlayerRules.selectPlayerLayout(1920, 984, false) == "horizontal")
     check("dock reserve is not added on top of a system inset", PlayerRules.bottomPaddingPx(true, 48, 1.5f) == 48)
@@ -728,6 +729,23 @@ private fun parityTests(root: File) {
         "filesize_320" to 0, "filesize_ape" to 0, "filesize_flac" to 20, "hash_flac" to "abcdef0123456789abcdef0123456789",
     )))
     check("kg playlist rows keep the original quality order", playlist.size == 1 && playlist[0].qualities == listOf("128k", "flac") && playlist[0].interval == "01:01" && playlist[0].songmid == "3")
+    val playlistOracle = ProcessBuilder("node", File(native, "tools/legacy-oracle.mjs").path, root.path, "playlist")
+        .redirectErrorStream(true)
+        .start()
+    val playlistText = playlistOracle.inputStream.bufferedReader().readText()
+    check("original playlist parsers run", playlistOracle.waitFor() == 0 && playlistText.trim().startsWith("{"), playlistText.take(200))
+    if (playlistText.trim().startsWith("{")) {
+        val expected = Json.parse(playlistText).obj()
+        val fixture = Json.parse(File(native, "tools/parity-playlist.json").readText()).obj()
+        val cards = MgPlaylist.parseRecommend(fixture["recommend"])
+        val songs = MgPlaylist.parseSongs(fixture["songs"])
+        val wantedCards = expected["cards"] as? List<*>
+        check(
+            "mg playlist list matches the original filter",
+            cards != null && wantedCards != null && cards.size == wantedCards.size && cards[0].id == (wantedCards[0] as Map<*, *>)["id"] && cards[0].name == (wantedCards[0] as Map<*, *>)["name"],
+        )
+        check("mg playlist songs match the original filter", sameTracks(songs?.tracks, expected["songs"]))
+    }
 }
 
 private fun sameTracks(tracks: List<CatalogTrack>?, expected: Any?): Boolean {
@@ -796,6 +814,20 @@ private fun agree(root: File, mode: String, label: String, captured: Captured, p
         log.append(line).append('\n')
         println(line)
     }
+}
+
+private fun oracleJson(root: File, mode: String, body: String): Map<String, Any?>? {
+    if (!body.trim().startsWith("{") && !body.trim().startsWith("[")) return null
+    val file = File.createTempFile("lx-oracle-", ".json")
+    file.writeText(body)
+    val proc = ProcessBuilder("node", File(root, "native-compat/tools/legacy-oracle.mjs").path, root.path, mode, file.path)
+        .redirectErrorStream(true)
+        .start()
+    val text = proc.inputStream.bufferedReader().readText()
+    val code = proc.waitFor()
+    file.delete()
+    if (code != 0 || !text.trim().startsWith("{")) return null
+    return Json.parse(text).obj()
 }
 
 private fun liveCatalog(root: File) {
@@ -886,6 +918,37 @@ private fun liveCatalog(root: File) {
         else -> kwRows.size
     }
     agree(root, "parse-kw", "kw", kwRaw, kwCount)
+    val mgLists = capture(policy, MgPlaylist.recommendUrl(1), MgPlaylist.headers)
+    val cards = if (mgLists.body.trim().startsWith("{")) runCatching { MgPlaylist.parseRecommend(Json.parse(mgLists.body)) }.getOrNull() else null
+    if (mgLists.clientError != null) {
+        check("mg playlist list did not fail inside the client", false, mgLists.clientError ?: "")
+    } else if (cards == null || cards.isEmpty()) {
+        val line = "INFO mg playlist list had no cards status=${mgLists.status} bytes=${mgLists.body.length}"
+        log.append(line).append('\n')
+        println(line)
+    } else {
+        val listed = oracleJson(root, "parse-mg-list", mgLists.body)
+        val first = cards.first()
+        val listedCount = (listed?.get("count") as? Number)?.toInt()
+        check(
+            "mg playlist list matches the original filter on the captured body",
+            listedCount == cards.size && listed?.get("id") == first.id,
+            "original=$listedCount port=${cards.size}",
+        )
+        val songsRaw = capture(policy, MgPlaylist.songsUrl(first.id, 1), MgPlaylist.headers)
+        val page = if (songsRaw.body.trim().startsWith("{")) runCatching { MgPlaylist.parseSongs(Json.parse(songsRaw.body)) }.getOrNull() else null
+        if (songsRaw.clientError != null) {
+            check("mg playlist songs did not fail inside the client", false, songsRaw.clientError ?: "")
+        } else {
+            val originalSongs = oracleJson(root, "parse-mg-songs", songsRaw.body)
+            val originalCount = (originalSongs?.get("count") as? Number)?.toInt()
+            check(
+                "mg playlist songs match the original filter on the captured body",
+                originalCount != null && originalCount == (page?.tracks?.size ?: 0),
+                "original=$originalCount port=${page?.tracks?.size} status=${songsRaw.status}",
+            )
+        }
+    }
 }
 
 private fun liveExample() {

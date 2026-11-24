@@ -49,6 +49,7 @@ class PlayerActivity : Activity() {
     private var searchHits: List<Map<String, Any?>> = emptyList()
     private var searchQuality = "128k"
     private var searchSource = "tx"
+    private var onlineCards = emptyList<Map<String, Any?>>()
     private var sourceButton: Button? = null
     private var floating: FloatingLyric? = null
     private var holdOverlay = false
@@ -82,6 +83,9 @@ class PlayerActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.getBooleanExtra("lx.car", false)) {
+            ClientPrefs.prefs(this).edit().putBoolean(ClientPrefs.CAR, true).commit()
+        }
         window.setSoftInputMode(
             android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN or
                 android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
@@ -134,6 +138,7 @@ class PlayerActivity : Activity() {
         if (resultCode != RESULT_OK || data == null) return
         if (requestCode == REQUEST_AUDIO) addAudio(data)
         if (requestCode == REQUEST_LYRIC) readLyric(data.data)
+        if (requestCode == REQUEST_SCRIPT) importScript(data.data)
     }
 
     private fun connect() {
@@ -199,6 +204,10 @@ class PlayerActivity : Activity() {
             button("收藏") { toggleFavorite() }.also { favoriteButton = it },
             button("播放收藏") { playFavorites() },
             button("歌单") { showPlaylists() },
+            button("在线歌单") { loadOnlinePlaylists() },
+            button("歌单歌曲") { loadOnlineSongs() },
+            button("播放歌单") { playOnlineSongs() },
+            button("导入脚本") { openScript() },
             button("保存歌单") { savePlaylist() },
             button("打开歌单") { openSavedPlaylist() },
             button("打开音频") { openAudio() },
@@ -326,7 +335,7 @@ class PlayerActivity : Activity() {
         val height = root.height
         if (width == 0 || height == 0) return
         val density = resources.displayMetrics.density
-        val mode = PlayerRules.selectPlayerLayout(width, height, ClientPrefs.prefs(this).getBoolean(ClientPrefs.CAR, false))
+        val mode = PlayerRules.selectPlayerLayout(width, height, ClientPrefs.prefs(this).getBoolean(ClientPrefs.CAR, false), density)
         val pane = if (mode == "car") PlayerRules.carPane(width, height, density) else mode
         val narrow = pane == "car-30"
         cover.visibility = if (narrow) View.GONE else View.VISIBLE
@@ -382,6 +391,7 @@ class PlayerActivity : Activity() {
             root.width,
             root.height,
             ClientPrefs.prefs(this).getBoolean(ClientPrefs.CAR, false),
+            resources.displayMetrics.density,
         ) == "car"
     }
 
@@ -564,20 +574,146 @@ class PlayerActivity : Activity() {
     private fun showPlaylists() {
         val favorites = favoriteTracks()
         val lists = LocalPlaylists.decode(ClientPrefs.prefs(this).getString(ClientPrefs.PLAYLISTS, null))
-        val fixture = KwCatalog.hotTags(listOf(mapOf("id" to "7", "digest" to "8", "name" to "热门")))
         val lines = ArrayList<String>()
         lines.add("收藏 " + favorites.size + " 首")
         favorites.take(8).forEach { lines.add("★ " + it.title) }
         if (lists.isEmpty()) lines.add("还没有保存在本机的歌单")
         lists.forEach { list -> lines.add(list.name + " · " + list.tracks.size + " 首") }
-        lines.add("夹具歌单「" + fixture[0].name + "」只来自解析器，没有联网。")
-        lines.add("酷我歌单地址是明文，没有打开。酷狗更高音质需要验证，没有绕过。")
+        lines.add("在线歌单走咪咕原版 HTTPS 列表。播放地址仍交给已导入脚本。")
+        if (onlineCards.isNotEmpty()) lines.add("已列出 " + onlineCards.size + " 个在线歌单")
         queue.text = lines.joinToString("\n")
     }
 
     private fun favoriteTracks(): MutableList<SavedTrack> {
         val lists = LocalPlaylists.decode(ClientPrefs.prefs(this).getString(ClientPrefs.FAVORITES, null))
         return (lists.firstOrNull()?.tracks ?: emptyList()).toMutableList()
+    }
+
+    private fun loadOnlinePlaylists() {
+        queue.text = "正在按原版地址打开咪咕歌单广场"
+        Thread {
+            val json = try {
+                ensureBroker().playlists("mg")
+            } catch (_: Exception) {
+                "{\"error\":\"broker\",\"cards\":[]}"
+            }
+            handler.post {
+                val root = try {
+                    Json.parse(json).obj()
+                } catch (_: RuntimeException) {
+                    queue.text = "歌单没有解析出来"
+                    return@post
+                }
+                if (root["error"] is String && root["cards"]?.list().isNullOrEmpty()) {
+                    queue.text = "歌单广场没有打开：" + root["error"]
+                    return@post
+                }
+                onlineCards = (root["cards"]?.list() ?: emptyList()).mapNotNull { it?.obj() }
+                if (onlineCards.isEmpty()) {
+                    queue.text = "这次歌单广场没有条目，状态 " + root["status"]
+                    return@post
+                }
+                queue.text = onlineCards.mapIndexed { index, card ->
+                    (index + 1).toString() + ". " + card["name"].strOrNull().orEmpty()
+                }.joinToString("\n") + "\n点「歌单歌曲」打开第一条。"
+            }
+        }.start()
+    }
+
+    private fun loadOnlineSongs() {
+        val id = onlineCards.firstOrNull()?.get("id").strOrNull()
+        if (id.isNullOrEmpty()) {
+            queue.text = "先打开在线歌单"
+            return
+        }
+        queue.text = "正在读取歌单歌曲"
+        Thread {
+            val json = try {
+                ensureBroker().playlistSongs("mg", id)
+            } catch (_: Exception) {
+                "{\"error\":\"broker\"}"
+            }
+            handler.post {
+                searchSource = "mg"
+                showSearch(json)
+            }
+        }.start()
+    }
+
+    private fun playOnlineSongs() {
+        val hits = searchHits.take(2)
+        if (hits.isEmpty() || searchSource != "mg") {
+            queue.text = "先打开歌单歌曲"
+            return
+        }
+        if (!java.io.File(filesDir, "user-script.js").isFile) {
+            queue.text = "歌单歌曲已经列出。还没有导入音源脚本，所以没有改走别的播放地址。"
+            return
+        }
+        queue.text = "正在让脚本为歌单里的歌取地址"
+        Thread {
+            val playable = ArrayList<SavedTrack>()
+            for (hit in hits) {
+                val info = mapOf(
+                    "source" to "mg",
+                    "name" to (hit["name"].strOrNull() ?: ""),
+                    "singer" to (hit["singer"].strOrNull() ?: ""),
+                    "songmid" to (hit["songmid"].strOrNull() ?: ""),
+                    "copyrightId" to ((hit["extra"]?.obj())?.get("copyrightId").strOrNull() ?: ""),
+                    "interval" to (hit["interval"].strOrNull() ?: ""),
+                )
+                val json = try {
+                    ensureBroker().resolveStored(LegacyMusicUrl.requestJson("mg", "128k", info))
+                } catch (_: Exception) {
+                    continue
+                }
+                val root = runCatching { Json.parse(json).obj() }.getOrNull() ?: continue
+                val url = root["url"].strOrNull()
+                if (root["admitted"] == "HTTPS" && !url.isNullOrEmpty()) {
+                    playable.add(SavedTrack(info["name"] as String, url))
+                }
+            }
+            handler.post {
+                if (playable.isEmpty()) queue.text = "脚本没有为这些歌返回地址。没有改用别的接口。"
+                else startTracks(playable, onlineCards.firstOrNull()?.get("name").strOrNull() ?: "在线歌单")
+            }
+        }.start()
+    }
+
+    private fun importScript(uri: Uri?) {
+        if (uri == null) return
+        val text = try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                val bytes = ByteArray(262_144)
+                val count = input.read(bytes)
+                if (count <= 0) "" else String(bytes, 0, count, Charsets.UTF_8)
+            } ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+        if (text.isEmpty()) {
+            queue.text = "脚本没有读出来"
+            return
+        }
+        Thread {
+            val json = try {
+                ensureBroker().installUserScript(text)
+            } catch (_: Exception) {
+                "{\"error\":\"broker\"}"
+            }
+            handler.post {
+                val root = runCatching { Json.parse(json).obj() }.getOrNull()
+                queue.text = if (root?.get("present") == true) "脚本已保存，下次打开仍会用这份。" else "这份脚本被拒绝了。"
+            }
+        }.start()
+    }
+
+    private fun openScript() {
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/*"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }, REQUEST_SCRIPT)
     }
 
     private fun openAudio() {
@@ -939,5 +1075,6 @@ class PlayerActivity : Activity() {
     companion object {
         private const val REQUEST_AUDIO = 41
         private const val REQUEST_LYRIC = 42
+        private const val REQUEST_SCRIPT = 43
     }
 }

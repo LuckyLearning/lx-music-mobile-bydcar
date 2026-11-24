@@ -1,0 +1,34 @@
+{
+  "recommend": {
+    "code": "000000",
+    "data": {
+      "contents": [
+        {
+          "contents": [
+            { "resType": "2021", "resId": "184187437", "txt": "热门" },
+            { "resType": "2021", "resId": "184187437", "txt": "重复" },
+            { "resType": "1", "resId": "9", "txt": "不是歌单" }
+          ]
+        }
+      ]
+    }
+  },
+  "songs": {
+    "code": "000000",
+    "data": {
+      "totalCount": 2,
+      "songList": [
+        {
+          "songId": "s1",
+          "songName": "歌",
+          "copyrightId": "c1",
+          "album": "专",
+          "duration": 65,
+          "singerList": [{ "name": "甲" }, { "name": "乙" }],
+          "audioFormats": [{ "formatType": "PQ" }, { "formatType": "ZQ" }]
+        },
+        { "songId": "s1", "songName": "重复" }
+      ]
+    }
+  }
+}

@@ -21,9 +21,14 @@ object PlayerRules {
         return normalizeLrcFontPt((normalizeLrcFontPt(value, fallback) + delta).toDouble(), fallback)
     }
 
-    /** Same rule as the current player: car layout only when that mode is on and the window is wider than tall. */
-    fun selectPlayerLayout(width: Int, height: Int, carLayoutEnabled: Boolean): String {
+    /**
+     * Car layout when that mode is on and either the window is wider than tall, or its dp size
+     * matches the planned BYD height band (including the tall 30% pane). A phone-sized window
+     * without that density stays vertical.
+     */
+    fun selectPlayerLayout(width: Int, height: Int, carLayoutEnabled: Boolean, density: Float = 0f): String {
         if (width <= 0 || height <= 0) return "vertical"
+        if (carLayoutEnabled && density > 0f && WindowProfile.classify(width, height, density).startsWith("car-")) return "car"
         if (carLayoutEnabled && width > height) return "car"
         if (width.toDouble() / height > 1.2) return "horizontal"
         return "vertical"

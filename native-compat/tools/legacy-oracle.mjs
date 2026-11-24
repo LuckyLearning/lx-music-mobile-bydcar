@@ -198,8 +198,43 @@ function parseCaptured() {
   }
 }
 
-if (mode === 'vectors') {
+function playlistVectors() {
+  const mg = loadModule('src/utils/musicSdk/mg/songList.js')
+  const info = loadModule('src/utils/musicSdk/mg/musicInfo.js')
+  const fixture = JSON.parse(readFileSync(resolve(here, 'parity-playlist.json'), 'utf8'))
+  const cards = mg.default.filterList2(fixture.recommend.data.contents)
+  const songs = info.filterMusicInfoListV5(fixture.songs.data.songList)
+  return {
+    cards: cards.map((card) => ({ id: String(card.id), name: card.name })),
+    songs: summary(songs),
+  }
+}
+
+function parseMgListFile() {
+  const mg = loadModule('src/utils/musicSdk/mg/songList.js')
+  const body = JSON.parse(readFileSync(extra, 'utf8'))
+  let cards = []
+  if (body?.code === '000000' && Array.isArray(body.data?.contents)) cards = mg.default.filterList2(body.data.contents)
+  else if (Array.isArray(body?.data?.contentItemList?.[1]?.itemList)) cards = mg.default.filterList(body.data.contentItemList[1].itemList)
+  return { count: cards.length, id: cards[0] ? String(cards[0].id) : '', name: cards[0]?.name || '' }
+}
+
+function parseMgSongsFile() {
+  const info = loadModule('src/utils/musicSdk/mg/musicInfo.js')
+  const body = JSON.parse(readFileSync(extra, 'utf8'))
+  const rows = body?.code === '000000' && Array.isArray(body.data?.songList) ? body.data.songList : []
+  const songs = rows.length ? info.filterMusicInfoListV5(rows) : []
+  return { count: songs.length, first: summary(songs)[0] || null }
+}
+
+if (mode === 'parse-mg-list') {
+  process.stdout.write(JSON.stringify(parseMgListFile()))
+} else if (mode === 'parse-mg-songs') {
+  process.stdout.write(JSON.stringify(parseMgSongsFile()))
+} else if (mode === 'vectors') {
   process.stdout.write(JSON.stringify(vectors(await txSign())))
+} else if (mode === 'playlist') {
+  process.stdout.write(JSON.stringify(playlistVectors()))
 } else {
   parseCaptured()
 }

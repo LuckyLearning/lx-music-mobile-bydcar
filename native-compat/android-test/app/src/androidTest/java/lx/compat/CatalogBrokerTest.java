@@ -103,6 +103,7 @@ public class CatalogBrokerTest {
         String[] sources = new String[] {"tx", "wy", "mg", "kg", "kw"};
         String chosen = null;
         String songmid = null;
+        String second = null;
         String hash = "";
         String name = "";
         String singer = "";
@@ -111,9 +112,12 @@ public class CatalogBrokerTest {
             String search = broker.search(source, "hello");
             assertFalse(search, search.contains("\"error\":\""));
             java.util.regex.Matcher id = java.util.regex.Pattern.compile("\"songmid\":\"([^\"]+)\"").matcher(search);
-            if (!id.find()) continue;
+            java.util.ArrayList<String> mids = new java.util.ArrayList<String>();
+            while (id.find() && mids.size() < 2) mids.add(id.group(1));
+            if (mids.isEmpty()) continue;
             chosen = source;
-            songmid = id.group(1);
+            songmid = mids.get(0);
+            if (mids.size() > 1) second = mids.get(1);
             java.util.regex.Matcher hashed = java.util.regex.Pattern.compile("\"128k\":\"([a-f0-9]{32})\"").matcher(search);
             if (hashed.find()) hash = hashed.group(1);
             java.util.regex.Matcher titled = java.util.regex.Pattern.compile("\"name\":\"([^\"]*)\"").matcher(search);
@@ -135,7 +139,29 @@ public class CatalogBrokerTest {
         assertTrue(resolved, url.find());
         String media = url.group(1).replace("\\/", "/");
         android.util.Log.i("LxScript", "source=" + chosen + " host=" + new java.net.URI(media).getHost());
+        if (second != null) {
+            String secondRequest = request.replace(songmid, second).replace("s1", "s2");
+            String secondResolved = broker.resolveScript(script, secondRequest);
+            assertFalse(secondResolved, secondResolved.contains("command-rejected op=preload"));
+            android.util.Log.i("LxScript", "second=" + (secondResolved.contains("\"admitted\":\"HTTPS\"") ? "https" : "script-reported"));
+        }
         play(media);
+    }
+
+    @Test
+    public void storedScriptReloadsAndLyricIsNotInvented() throws Exception {
+        IBroker broker = bind();
+        String script = readAsset("user-script.js");
+        String saved = broker.installUserScript(script);
+        assertTrue(saved, saved.contains("\"present\":true"));
+        String again = broker.scriptInfo();
+        assertTrue(again, again.contains("\"present\":true"));
+        assertTrue(again, again.contains("\"bytes\":" + script.getBytes("UTF-8").length));
+        String rejected = broker.installUserScript("shutdown");
+        assertTrue(rejected, rejected.contains("script-rejected"));
+        String lyric = broker.resolveStored("{\"requestKey\":\"l1\",\"data\":{\"source\":\"tx\",\"action\":\"lyric\",\"info\":{\"musicInfo\":{\"songmid\":\"1\"}}}}");
+        assertTrue(lyric, lyric.contains("\"admitted\":\"missing\""));
+        assertFalse(lyric, lyric.contains("\"admitted\":\"HTTPS\""));
     }
 
     @Test
