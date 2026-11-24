@@ -1,0 +1,396 @@
+<cursor_untrusted_data_1337 source="ReadCanvas">
+
+Canvas "LX原生Android重构实施方案：手机与BYD车机（兼容验证阶段）" (https://cursor.com/canvas/store-39b02641-2778-43cf-8f3d-8f7460c00319/ca733a3d-1000-4664-bf5b-1394756246ea):
+
+import { Page, Section, Text, Table, TableOfContents, Callout, Diagram, Sequence, Steps, NumberedList, LinkCards } from "grok/canvas";
+const sha = "ad77216fdb3d195072cdddbe687006715971ecad";
+const base = `https://github.com/LuckyLearning/lx-music-mobile-bydcar/blob/${sha}/`;
+const code = (title: string, file: string, a: number, b: number) => ({ title, href: `${base}${file}#L${a}-L${b}`, site: "已审查源码快照 · ad77216f" });
+const official = (title: string, href: string) => ({ title, href, site: "官方资料 · 本轮已查阅" });
+const pre = "android/app/src/main/assets/script/user-api-preload.js";
+const refs = {
+ sdk: code("平台元数据 SDK：五源注册与跨源搜索", "src/utils/musicSdk/index.js", 1, 77),
+ api: code("自定义源业务桥：20 秒超时与请求登记", "src/core/init/userApi/index.ts", 10, 168),
+ preload1: code("脚本契约：事件、平台、音质、动作与结果校验", pre, 128, 258),
+ preload2: code("脚本契约：初始化、crypto 与 Buffer 工具", pre, 304, 424),
+ preload3: code("脚本契约：request/send/on、version 2.0.0、env mobile", pre, 446, 528),
+ preload4: code("脚本运行环境：长度限制与定时器", pre, 3, 87),
+ restrict: code("脚本环境限制：eval / Function 被限制", pre, 535, 591),
+ request: code("当前脚本网络代理的真实行为", "src/core/init/userApi/request.js", 11, 121),
+ scriptimport: code("脚本注释头、元信息与原文存储", "src/utils/data.ts", 505, 570),
+ quick: code("原有 QuickJS 的初始化与执行边界", "android/app/src/main/java/cn/toside/music/mobile/userApi/QuickJS.java", 125, 180),
+ deps: code("原项目依赖版本与许可证声明", "package.json", 41, 68),
+ wrapper: code("原有QuickJS wrapper及API21颜色库固定说明", "android/app/build.gradle", 194, 201),
+ android: code("原项目 minSdk 21 / targetSdk 29", "android/build.gradle", 1, 10),
+ car: code("车机布局、歌词、设置与控制栏显隐、56dp Dock", "src/screens/PlayDetail/CarLayout/index.tsx", 88, 205),
+ idle: code("五秒无操作隐藏设置", "src/screens/PlayDetail/playerLayout.ts", 1, 23),
+ font: code("磅字号、最小值与比例转换", "src/screens/PlayDetail/lrcFontSize.ts", 1, 33),
+ defaults: code("播放器与悬浮歌词已有设置全集", "src/config/defaultSetting.ts", 18, 121),
+ boot: code("后台自启与启动自动播放的独立决策", "src/core/boot/background.ts", 77, 180),
+ media: code("现有 Remote 媒体命令入口", "src/plugins/player/service.ts", 28, 78),
+ fields: code("迪链歌词 metadata/extras 的键和三行窗口", "src/plugins/player/carLyricWindow.ts", 1, 45),
+ patch: code("现有 MediaSession 歌词补丁", "scripts/patch-track-player-byd-lyrics.mjs", 96, 192),
+ local: code("本地目录扫描及限流导入", "src/screens/Home/Views/Mylist/MyList/listAction.ts", 128, 205),
+ sync: code("同步 v4 协议与 list/dislike 能力", "src/plugins/sync/constants.ts", 22, 71),
+ backup: code("列表导入导出存在，设置/全量导出按钮未开放", "src/screens/Home/Views/Setting/settings/Backup/Part.tsx", 16, 32),
+ appid: code("现包名、ABI 和 versionCode 规则", "android/app/build.gradle", 111, 183),
+ license: code("原仓 Apache-2.0 许可证", "LICENSE", 1, 25),
+ compose: official("Compose UI 发布说明：1.10.0-alpha01 起 minSdk 提升至 23", "https://developer.android.com/jetpack/androidx/releases/compose-ui#1.10.0-alpha01"),
+ mediarelease: official("Media3：1.9.0 起 minSdk 23；1.8.0 为兼容候选", "https://developer.android.com/jetpack/androidx/releases/media3#1.9.0"),
+ room: official("Room：2.8.0 从 API21 提升到 API23", "https://developer.android.com/jetpack/androidx/releases/room#2.8.0"),
+ datastore: official("DataStore：1.1.7 的官方发布记录", "https://developer.android.com/jetpack/androidx/releases/datastore#1.1.7"),
+ androidx: official("AndroidX：最低 API 的默认值只影响新发布制品", "https://developer.android.com/jetpack/androidx/versions"),
+ background: official("Player 与 MediaSession 应由 Service 持有", "https://developer.android.com/media/media3/session/background-playback"),
+ isolation: official("isolatedProcess 与普通 process 的权限差别", "https://developer.android.com/guide/topics/manifest/service-element#isolated"),
+ engine: official("QuickJS C API：内存、栈限制与执行中断", "https://bellard.org/quickjs/quickjs.html#Memory-handling"),
+ appdata: official("应用私有数据不可跨包直接访问；卸载会删除", "https://developer.android.com/training/data-storage/app-specific"),
+ updates: official("覆盖升级：applicationId、签名与 versionCode 条件", "https://developer.android.com/google/play/app-updates"),
+ migration: official("新版自身存储演进与 destructive migration 风险", "https://developer.android.com/training/data-storage/room/migrating-db-versions"),
+ fgslimit: official("Android15/target35 的 BOOT_COMPLETED 前台服务限制", "https://developer.android.com/about/versions/15/behavior-changes-15#fgs-boot-completed"),
+};
+type R = keyof typeof refs;
+const cite = (...keys: R[]) => <LinkCards links={keys.map((key: R) => refs[key])} />;
+const aar = (artifact: string, path: string, version: string, min: string) => [artifact, version, min, `https://dl.google.com/dl/android/maven2/${path}/${version}/${path.split('/').pop()}-${version}.aar`];
+const heads = ["01｜已批准方向与强约束", "02｜API21兼容选型与证据", "03｜双场景架构、进程与状态所有权", "04｜现有LX音源的最低兼容契约", "05｜引擎、安全隔离与兼容验收", "06｜从启动到出声的目标流程", "07｜现有功能逐项重实现矩阵", "08｜全新数据、安装与发布边界", "09｜分阶段实施与停止门槛", "10｜性能目标与手机/车机验收矩阵", "11｜工程安全、许可与发布", "12｜集中决策清单与下一步"];
+export default function App() {
+ return <Page title="LX原生Android重构实施方案：手机与BYD车机（兼容验证阶段）" summary="开发已获批准；按用户最新指示，box新增开发已停止，现整理可复现交接供Cursor云端续做。兼容gate尚未通过，未完成客户端。手机＋BYD共享Kotlin核心、API21、系统3:7双分区及不迁旧数据等边界不变。" width="column" lang="zh-Hans">
+  <Callout lead="已批准开发 · box已停止新增开发，转Cursor云端交接" tone="info">2026-11-24（北京时间UTC+8），用户已批准开发，随后明确改用Cursor云端。box现保留代码并交接，不再双写；本页记录真实阶段结果，不能视为兼容gate通过。手机＋BYD双场景、全屏/30%区/70%区、API21与不迁移旧数据继续有效。未授权发布、覆盖安装、改master或删除数据。</Callout>
+  <TableOfContents items={heads.map((label: string, i: number) => ({ label, id: `p${i + 1}` }))} />
+
+  <Section id="p1" heading={heads[0]}>
+   <Table columns={["类别", "决策/约束", "状态"]} rows={[
+    ["总体方向", "Android手机与BYD车机两个同等目标场景，不是车机专用。共享Kotlin原生播放/数据/音源核心，自适应手机竖横屏与车机UI；不再以RN/WebView承担产品界面或播放控制。", "双场景与本地开发已批准；先兼容验证"],
+    ["模式与同步", "车机模式由用户手动开关，不按厂商/品牌字符串强切；窗口大小只决定排版。两台设备各有本地数据与播放器，不默认同步或接力。", "可选同步另列，不作为双场景承诺"],
+    ["现有音源", "保留LX音源文件兼容方向，不要求为原生版重写源；pdone/lx-music-source作为首批真实样本与使用说明参考，按固定版本测试。恶意/下架源不纳入可执行兼容承诺。", "参考仓已给定；无需等待补文件才能规划"],
+    ["旧数据范围", "新版可从空数据开始：不读旧播放历史/队列/进度、歌单/收藏、设置、源记录或配对数据，不开发旧格式导入转换；不以此要求卸载或清除旧版。", "用户已明确排除旧数据兼容与迁移"],
+    ["最低系统", "minSdk 21 必须保留；不能通过静默升到23/24规避依赖冲突。", "硬约束"],
+    ["BYD环境", "用户报告Android12、DiLink5.0、arm64-v8a、1920×984px、density1.5（240dpi）；理论1280×656dp。实际SDK_INT待核对，准备覆盖Android12/12L相应API31/32，不把32当已读实机值。", "用户提供；本轮未连接设备"],
+    ["BYD窗口状态", "系统3:7双分区，只有两个区，一个30%、一个70%；应用需适配全屏、占30%区、占70%区三种状态，不是三个/七个窗口，也不是任意比例。", "比例已明确；精确可用尺寸/断点待实车校准"],
+    ["当次可用资源", "可用内存2837MB、可用存储127068MB，均为本次反馈时可用量，不是总物理容量或应用独占预算；不据此推导性能/缓存上限。", "用户快照值；运行时仍需检查"],
+    ["手机环境", "具体型号、Android版本和ABI未知，不阻塞规划；先用API21兼容基线及小屏/大屏、竖横屏与后台/耳机蓝牙场景准备测试，手机实机后补。", "不额外追问；结果按模拟器/实机分列"],
+    ["功能范围", "首个正式原生版对已交付产品能力逐项重实现；仅按本次决定排除旧数据互通，不把完整客户端悄悄砍成MVP。", "建议作为发布硬门槛"],
+    ["工作量", "不以省工作量为由牺牲兼容/恢复/数据安全；分阶段是控制风险，不是缩减最终范围。", "遵循用户偏好"],
+    ["旧版边界", "当前RN版保持可用，不覆盖master、不提前切换更新源；用户最新选择改用Cursor云端，box停止新增开发并交接。禁止重试此前被dismiss的gh OAuth；不推送远端。", "规划默认"],
+    ["非目标", "不自动新增完整下载、语音助手、音效、Android Auto/AAOS模板、云账号；不内置未授权音源，不保证第三方平台永久可用。", "新增功能需另批"]
+   ]} />
+   <Text>建议默认路线：以固定API21兼容依赖构建共享核心和一套自适应Compose UI，覆盖手机竖屏/横屏与手动车机模式；Media3持有播放与媒体会话，Room/DataStore持久化，受限进程运行QuickJS音源。依赖边界已有静态证据，但完整依赖图、引擎、手机与车机都未构建/验证。音源与API21两道兼容门过不了，就停止并回报，不带病推进。</Text>
+   <Text>源码基准沿用前次审查的0.0.11、提交ad77216fdb3d195072cdddbe687006715971ecad。该SHA作为契约提取基准，不宣称此刻最新master。原checkout只读保留，兼容验证在隔离目录进行；原审查报告继续作为证据底稿。</Text>
+   <LinkCards links={[{ title: "原审查报告：实现流程、性能与功能", href: "https://cursor.com/canvas/store-39b02641-2778-43cf-8f3d-8f7460c00319/aad8b084-9a42-42d2-a121-17ad5c292d8c", site: "背景资料 · 不覆盖" }]} />
+  </Section>
+
+  <Section id="p2" heading={heads[1]}>
+   <Table columns={["组件", "拟固定版本", "兼容边界与决策"]} rows={[
+    ["Compose UI / Foundation / Runtime", "1.9.5，逐项固定", "本轮从Google Maven读取三种android AAR的Manifest，均声明minSdk21；官方在1.10.0-alpha01记录抬升至23。不是把1.9错误归为不支持21。"],
+    ["Activity Compose", "1.10.1", "本轮所读AAR声明minSdk21；Activity、Lifecycle等传递依赖也必须锁定，不能随最新版自动升级。"],
+    ["Media3 ExoPlayer / Session / Common", "统一1.8.0", "本轮读取三个AAR均声明minSdk21；1.9.0起官方最低23。不用新版文档API直接假设1.8具备。"],
+    ["Room runtime", "2.7.2", "room-runtime-android AAR声明minSdk21；2.8.0起官方最低23。编译器、KSP和SQLite依赖要一起验证。"],
+    ["Preferences DataStore", "1.1.7", "所读datastore-preferences-android AAR声明minSdk19，低于本项目21；仍须核对完整传递依赖。不能由此声称最新DataStore也支持21。"],
+    ["网络、图片、协程、序列化", "阶段1形成精确版本锁", "优先API21可维护稳定线；例如OkHttp兼容线需核对TLS/API21，不使用动态版本。图片必须按目标尺寸采样和限额。此处不虚构已解析依赖图。"],
+    ["Kotlin / Compose编译插件 / AGP / KSP / JDK", "阶段1冻结工具链", "编译工具所需JDK、compileSdk与运行时minSdk是不同维度；依据上述制品和KSP/Kotlin矩阵统一选择，不混搭旧编译器与新运行库。"]
+   ]} />
+   <Text>已验证的仅是上述单个官方制品Manifest和发布记录；没有验证完整传递图、manifest merge、DEX、JNI、R8或API21启动。确认后先建立依赖锁/校验，扫描所有引入模块的minSdk及API调用，再在API21/22兼容环境、手机尺寸/系统测试矩阵与Android12主车（实际API待核对）上跑兼容测试；手机型号后补不阻塞准备。禁止tools:overrideLibrary掩盖最低系统不满足，也不能把高minSdk库装进单APK后仅用if(SDK_INT)就宣称解决。</Text>
+   <Table columns={["方案", "判断"]} rows={[
+    ["A · 单UI＋固定兼容依赖", "推荐默认：Compose1.9.5＋Media3 1.8.0＋Room2.7.2＋DataStore1.1.7，维护兼容分支和必要修复，拒绝不经评估自动升级。适合先把已有功能完整对齐。"],
+    ["B · Kotlin Views / RecyclerView替代Compose", "若兼容Compose存在不可接受缺陷或维护障碍，改用原生View方案，业务/播放/数据不变，仍是全原生；视为技术门失败后的变更，先回报，不擅自换方向。播放器/数据依赖仍须兼容21。"],
+    ["C · API21–22兼容APK＋现代APK", "长期可选：共享domain/协议，两套variant/dependency graph，现代包可升级库；可能需要双UI、双测试和统一versionCode策略。不是在一个依赖图里任意混两代Compose，默认不增加这条维护线。"]
+   ]} />
+   {cite("android", "compose", "mediarelease", "room", "datastore", "androidx")}
+   <Section heading="本轮核对的官方制品（仅静态Manifest）">
+    <Table columns={["制品", "版本", "minSdk", "Google Maven原始链接"]} rows={[
+     aar("ui-android", "androidx/compose/ui/ui-android", "1.9.5", "21"),
+     aar("foundation-android", "androidx/compose/foundation/foundation-android", "1.9.5", "21"),
+     aar("runtime-android", "androidx/compose/runtime/runtime-android", "1.9.5", "21"),
+     aar("activity-compose", "androidx/activity/activity-compose", "1.10.1", "21"),
+     aar("media3-exoplayer", "androidx/media3/media3-exoplayer", "1.8.0", "21"),
+     aar("media3-session", "androidx/media3/media3-session", "1.8.0", "21"),
+     aar("media3-common", "androidx/media3/media3-common", "1.8.0", "21"),
+     aar("room-runtime-android", "androidx/room/room-runtime-android", "2.7.2", "21"),
+     aar("datastore-preferences-android", "androidx/datastore/datastore-preferences-android", "1.1.7", "19")
+    ]} />
+    <Text>核对方式：只读下载公开AAR到内存、读取AndroidManifest.xml，没有安装、运行库代码或创建工程。检索日期2026-11-24（北京时间UTC+8）；本方案不依赖搜索摘要对版本的笼统推断。</Text>
+   </Section>
+  </Section>
+
+  <Section id="p3" heading={heads[2]}>
+   <Diagram direction="vertical" nodes={[
+    { id: "phone", label: "Android手机", detail: "竖屏 / 横屏 · 小屏 / 大屏 · 系统栏 / 键盘 / 手势" },
+    { id: "car", label: "BYD车机：三个应用窗口状态", detail: "全屏 / 系统3:7双分区内占30%区 / 占70%区（只有两个分区）" },
+    { id: "adaptive", label: "自适应UI与手动车机模式", detail: "模式由用户开关；排版按实际窗口和insets，不按厂商品牌强切" },
+    { id: "ui", label: "主进程：共享Kotlin原生界面层", detail: "Compose · ViewModel · MediaController · 分页目录客户端" },
+    { id: "play", label: ":playback：原生核心服务", detail: "MediaSessionService · 唯一播放器/队列命令协调器" },
+    { id: "data", label: "数据与协议模块", detail: "Room / DataStore单写入所有者 · Kotlin平台适配 · 可选同步端口" },
+    { id: "broker", label: "宿主能力代理", detail: "HTTP / 定时 / 配额 / 日志脱敏 · 不向JS暴露Context" },
+    { id: "js", label: "isolatedProcess：音源兼容引擎", detail: "QuickJS候选 · 旧lx 2.0.0 mobile契约 · 无直接网络/文件权限" },
+    { id: "out", label: "通用Android输出＋可选BYD适配", detail: "手机/车机共用音频与会话；通知/锁屏/蓝牙；BYD歌词能力独立适配" }
+   ]} edges={[
+    { from: "phone", to: "adaptive", label: "当前手机窗口" },
+    { from: "car", to: "adaptive", label: "全屏 / 30%区 / 70%区的实际窗口" },
+    { from: "adaptive", to: "ui", label: "只换排版，不换播放器" },
+    { from: "ui", to: "play", label: "命令 / 只读状态快照" },
+    { from: "play", to: "data", label: "仓储接口 / 持久化 / 平台查询" },
+    { from: "play", to: "broker", label: "URL解析 / 能力授权" },
+    { from: "broker", to: "js", label: "受限IPC，携带会话与代次" },
+    { from: "play", to: "out", label: "唯一音频与媒体状态" }
+   ]} />
+   <Text>图是单台设备内的运行时关系，不是手机与车机之间的网络连接；每次安装独立运行、独立存储。推荐同一代码库/产品共享核心，只有显示与系统能力适配不同；不为手机和车机各造一套播放器。模块编译依赖按端口反转：domain/model不依赖Android、Compose或JS；playback、ui依赖domain与稳定IPC模型；Room/网络/source-runtime实现domain端口，由app装配。UI不直接调用JS或写数据库，平台适配不依赖播放器UI。音源兼容层是明确边界，不把旧React业务整体藏进JS继续运行。</Text>
+   <Table columns={["模块/线程", "所有权和约束"]} rows={[
+    ["adaptive-ui / window-profile", "手动车机开关与窗口尺寸分离：手机横屏不自动变车机；开关开着进入30%窄区时换紧凑车机排版，不丢设置或重启播放。普通手机竖/横屏共享导航、歌词与队列状态。"],
+    ["窗口与insets", "运行时WindowMetrics/兼容窗口指标＋系统栏、手势、刘海、IME与Dock实际占用决定可用区；原生WindowMetrics为API30+，API21使用经验证兼容层/根View测量和insets，不能无版本保护直接调用。"],
+    ["通用系统 / BYD适配", "通用MediaSession、通知/锁屏、蓝牙/有线耳机、音频焦点用于两场景；BYD歌词与多显示器能力封装在可选适配器。能力探测用于安全启用相应接口，不用于按厂商字符串强制切UI。"],
+    ["domain / model", "TrackId、PlaylistEntryId、SourceCapabilities、Quality、PlaySessionId、LyricTimeline、新版schema版本等稳定模型；保留旧平台字段供兼容映射，不把UI对象当数据契约。"],
+    ["playback-service", "持有唯一ExoPlayer、MediaSession、队列、自动播放意图和恢复协调器。Player applicationLooper上的命令串行执行；默认服务主Looper，只做轻量状态操作，网络/数据库/JS绝不阻塞它。"],
+    ["状态唯一来源", "实际音轨/播放状态/position以服务中的Player为准；播放意图与解析阶段由同一服务协调器持有。UI、通知、悬浮窗只消费带revision的快照；Room存checkpoint，不作为实时播放真相。"],
+    ["data / settings", "由:playback内仓储统一拥有Room、DataStore实例与写队列；UI经受控目录IPC分页读取，不能跨进程各自开一个同文件DataStore。需要多进程读取时单独设计，不靠多个单例侥幸一致。"],
+    ["网络/磁盘/解析", "协程IO、限并发HTTP、数据库事务执行器、歌词解析CPU线程；取消绑定sessionId，解码走Media3内部线程。"],
+    ["source-runtime", "一个runtime/context只在其专用引擎线程触达；Promise微任务/定时器/网络回调按明确队列调度。脚本崩溃不直接杀播放服务。"],
+    ["overlay / car-integration", "窗口View操作在相应进程主线程；跨进程只发必要歌词/元数据，不建立第二播放器或独立的真实播放时钟。"]
+   ]} />
+   <Text>三进程设计是拟选，不是零成本保证：主界面崩溃时音频服务可独立存活；播放进程被系统杀仍需从事务checkpoint恢复。Binder死亡、服务重连、前台服务启动限制和内存总和都列入验收。MediaController控制会话，目录/设置使用专门窄IPC；大歌单、完整脚本不塞进单个Binder事务。</Text>
+   {cite("background", "isolation")}
+  </Section>
+
+  <Section id="p4" heading={heads[3]}>
+   <Text>必须兼容的是当前Mobile真实契约，不是笼统的“支持JavaScript”或桌面版全部API。用户脚本的@version是脚本自身版本；宿主暴露的lx.version应保留2.0.0、lx.env在Android手机和BYD车机两种UI下都保留mobile，不能因打开车机模式改成desktop/car或新客户端版本号，诱导脚本走不同分支。</Text>
+   <Table columns={["契约项", "当前源码提取的最低行为", "重构验收要求"]} rows={[
+    ["导入与身份", "脚本开头块注释，识别@name/description/author/homepage/version；存储原文。lx.currentScriptInfo含元信息和rawScript。", "导入原文件、字节摘要不变；保留元信息/允许更新提示开关；日志不打印原文。"],
+    ["环境与语法", "lx.version=2.0.0、env=mobile；QuickJS环境，Promise/TypedArray/Map等；不是Node或浏览器DOM。eval及Function动态构造被限制，只有特定宿主工具。", "固定兼容profile；不擅自增加Node require、文件系统、DOM或任意Java反射。脚本实际语法由样本验证。"],
+    ["事件握手", "lx.EVENT_NAMES: request/inited/updateAlert；lx.on(request,handler)注册处理器；lx.send(inited,{sources})一次初始化，重复初始化拒绝；updateAlert原则上一次。", "保留Promise解析/拒绝、错误信息、this=lx和初始化先后顺序；注册完成/初始化完成前不派发业务请求。"],
+    ["能力协商", "kw/kg/tx/wy/mg/local；type=music，actions/qualitys与宿主白名单取交集。五个在线平台当前白名单主要为musicUrl，local另有lyric/pic；xm不在allSources初始化循环内。", "按源码实际暴露，不因源码存在某函数就宣称脚本可对所有源提供全部动作；未知能力明确拒绝。"],
+    ["业务请求", "request handler接收{source,action,info}；info含type、musicInfo等旧结构，返回thenable/Promise。musicUrl/pic校验HTTP(S)字符串且长度≤2048。", "新Track模型通过兼容映射器还原旧字段；返回/异常按旧事件封装，无旧请求串新曲。"],
+    ["歌词结果", "lyric为字符串且≤51200字符；tlyric/rlyric分别<5120，lxlyric<8192，否则相应附属字段置空；有固定字段格式。", "记录边界值、空值和非法字段黄金样本；不把字符限制误写成字节限制。"],
+    ["HTTP调用", "lx.request(url,options,callback)；支持method/headers/body/form/formData/binary/timeout；回调(err,resp,body)，resp含statusCode/statusMessage/headers/body；返回取消函数。", "不是Fetch Response对象。复刻JSON/文本响应判断、头部/编码/重定向和错误类别；formData当前实现有边界风险，必须以样本厘清，不静默声称全面支持。"],
+    ["超时与取消", "宿主业务桥20秒；脚本HTTP代理默认13秒；脚本自填timeout被上限60000限制。脚本网络取消消息存在，但上层musicUrl等canceleFn为空。", "对外保留兼容错误/超时profile，对内贯通可取消Job；完成/取消/超时只终结一次。修复空取消不等于把原来的缺陷当必须继承的行为。"],
+    ["定时与回调序", "提供setTimeout/clearTimeout；callback登记ID，clear仅移除回调；原生再派发。业务Promise、网络回调、微任务与切源销毁存在交错。", "单runtime事件队列；测试同步抛错、Promise resolve/reject、定时器、网络完成、切源、进程死亡的所有交错，不能仅按最终值相同验收。"],
+    ["二进制与Buffer", "lx.utils.buffer.from支持字符串的base64/hex/默认编码、数组；输出Uint8Array；bufToString支持hex/base64/utf8/binary，语义并非完整Node Buffer；HTTP binary还经过现有桥序列化。", "覆盖0x00/0x80/0xFF、空数组、中文、emoji和无效编码；HTTP body结构用旧桥黄金记录验证，不能擅自当ArrayBuffer或标准Buffer。"],
+    ["crypto", "aesEncrypt: aes-128-cbc与aes-128-ecb；rsaEncrypt使用原始RSA NoPadding；md5、randomBytes；底层Java/JCA与base64/字节工具共同决定结果。", "AES填充、IV、密钥字节、RSA公钥格式/前导零/块长逐项向量对齐；兼容crypto只做协议，不拿MD5/原始RSA当新安全设计。randomBytes旧实现用Math.random，升级随机源要做兼容评估。"],
+    ["资源约束", "preload单个原生工具字符串默认限制1048576字符；nativeCall序列化消息限制2097152字符，另有URL/歌词限制。", "保留必要输入边界；新的运行时CPU/内存/网络配额先验证真实源，不能任意缩小导致现有源不可用。大消息跨进程分块或只读管道传输。"]
+   ]} />
+   <Text>职责必须分开：搜索、榜单、平台歌单、评论等主要来自原有musicSdk平台适配，不是用户musicUrl脚本天然提供。目标是将这些平台协议按原行为迁为Kotlin适配器，保留必要的加密/签名测试向量；用户JS音源继续负责声明的地址解析等能力。第一版不能只做“粘贴URL播放器”却声称完成LX重构。</Text>
+   {cite("sdk", "scriptimport", "preload1", "preload2", "preload3", "preload4", "restrict", "request", "api")}
+  </Section>
+
+  <Section id="p5" heading={heads[4]}>
+   <Table columns={["候选", "角色与进入门槛"]} rows={[
+    ["QuickJS系列 · 优先", "以当前wang.harlon.quickjs:wrapper-android:2.4.0行为作为对照基线；正式绑定可维护C/JNI封装或受审查wrapper，核心版本另行冻结。必须具备API21/arm64及所需ABI构建、Promise job pump、内存/栈上限、CPU中断和可销毁性。不是原wrapper版本号等于引擎核心版本。"],
+    ["原wrapper直接复用", "只可作为兼容验证起点；若无法安全中断、存在不可接受缺陷或ABI不满足，不因“旧版能跑”直接定为正式依赖。"],
+    ["V8/Javet等", "备选引擎族，不预设支持API21或所有ABI；需额外验证体积、JNI、最低API、隔离及宿主桥语义。语法更全也不自动兼容现有Mobile API。"],
+    ["Rhino", "纯Java候选但现代JS/Promise/TypedArray差异可能大，不作为默认省事替代。"],
+    ["WebView", "不推荐用来保留隐藏RN/网页业务；系统WebView版本和JS能力随旧车机变化，不作为默认音源引擎。"]
+   ]} />
+   <Text>隔离策略：普通android:process=":source"只换进程，通常仍是应用UID和同一权限，不是权限沙箱。默认设计使用android:isolatedProcess=true的受限Service，源运行时不直接有网络/文件/账号权限；仅接收脚本文本、必要歌曲数据，能力请求由宿主broker执行。不能向JS暴露Context、任意文件路径、反射或裸socket；isolatedProcess本身也不替代内存安全审计和broker授权。</Text>
+   <Text>Broker必须做方法/URL/scheme校验、DNS解析及每次重定向的私网/回环目标检查、并发/响应体配额、超时取消和日志脱敏；TLS不全局关闭校验。若当前用户源依赖HTTP或局域网，先检测并报告，按该源单独确认例外，不能全局禁用后把不可用说成“兼容成功”，也不能为兼容默认开放所有内网。</Text>
+   <Text>大脚本/歌词不直接使用接近2MB的Binder包；采用有长度/摘要/配额的分块或只读管道。引擎崩溃或超限后使当前任务失败并回收runtime，不能无限重启；已解析曲目继续播放，下一首解析失败需可见反馈。已有指定参考仓足以准备验证，不再以“等用户提供音源”作为规划阻塞；实际可用性和兼容率仍须未来对照测试，不能承诺100%。</Text>
+   <Steps steps={[
+    { title: "先静态提取契约", detail: "确认之后，冻结旧preload、旧桥和样本字段，整理真实脚本需要的能力；本轮只完成上述源码级清单。" },
+    { title: "再合成脚本离线对照", detail: "初始化、Promise顺序、计时、取消、异常、编码、crypto用假HTTP/确定性向量对照旧桥；不以访问真实源作为单元测试前提。" },
+    { title: "固定参考仓样本并对照", detail: "确认开发/测试范围后，优先按下表的固定提交与版本准备样本，先审查再用旧Mobile基线和新兼容层离线对照；真实服务测试另在允许的边界内开展。本轮不执行脚本、不触发源API。" },
+    { title: "兼容失败即停", detail: "发现必须改用户脚本、提高minSdk或放宽到不安全能力时，回报差异和选项；不默默删功能、换源或直接发布。" }
+   ]} />
+   {cite("deps", "wrapper", "quick", "isolation", "engine")}
+   <Section heading="用户指定参考仓：已核实事实与样本边界">
+    <Table columns={["核实项", "结论 / 证据级别"]} rows={[
+     ["固定基准", "pdone/lx-music-source，默认main，本轮读取的main顶端为07dca9589e3734b140ec4ef396ee29dfe63687a2；该提交时间2026-11-22 11:22:56（北京时间UTC+8）。下述链接固定该SHA，不跟随main/latest滚动。"],
+     ["仓库性质与结构", "README自述“内容源于网络”；19个源目录，提供版本文件及latest.js、CreateLatest.py、probe.py、健康检查工作流。以第三方音源收集/分发和维护工具为主，不是LX客户端、QuickJS宿主实现或官方兼容认证。"],
+     ["客户端声明", "README项目地址列出desktop（Windows/macOS/Linux）、mobile（Android/iOS）、sync-server和any-listen；未给逐源客户端版本支持表。列出项目链接不等于每个脚本支持这些客户端，更不等于已验证本车机fork。"],
+     ["使用方式", "README在线导入给每源GitHub raw链接和第三方代理链接，目标为main/各目录/latest.js；本方案仅记录使用说明，不调用导入、不访问这些脚本运行端点。验证样本改用固定提交＋版本路径。"],
+     ["版本 / 维护", "CreateLatest.py列出源版本并复制为latest别名，所查Huibq与QingLiang目录的版本文件和latest具有相同blob。仓库未归档；GitHub Releases返回空列表，不等于没有版本文件。README与工作流声明每日01:00（北京时间）探测，状态变化写health-status分支。健康图片不是Mobile播放或音质可用证明，本轮未执行探测。"],
+     ["安全事件 · 作者声明", "最新提交和README警告：LX（独家音源）已下架，作者称其在具备Node能力的宿主中可执行强制关机，并链接issue16。本轮未复现、未读取/运行该历史样本；普通样本也不能因此被推定安全。下架源排除执行，用无害能力探针验证require/child_process/系统命令不可达。"],
+     ["许可 / 边界", "GitHub元数据license为空，所读根目录未列LICENSE；不能将主客户端Apache-2.0套给收集脚本。不默认捆绑、镜像或自动启用这些源；仍由用户主动导入，逐源核对许可/用途。README还含删除已导入下架源的建议，本轮没有据此操作用户客户端或删除任何文件。"]
+    ]} />
+    <Table columns={["首批样本", "固定身份", "本轮静态核对 / 未验证项"]} rows={[
+     ["Huibq 1.2.0", "huibq/1.2.0.js；Git blob f2028068db448a9e0b738106112eb300bcefbcc2；2727字节", "仅此小型可读脚本全文静态阅读：使用globalThis.lx、request回调、Promise、on/send、env/version；mobile与非mobile有日志分支。声明kw/kg/tx/wy/mg，动作仅musicUrl，音质仅128k/320k；使用hash或songmid。没有据此证明服务在线、FLAC或媒体播放可用。"],
+     ["QingLiang 2.1.0", "qingliang/2.1.0.js；Git blob 137716abd28c6ec3449ee661e686816f30545370；26416字节", "只读目录/版本元数据，未展开脚本；README称“四平台多源并行”，具体平台、质量、分支与API尚待静态审查，不能自行填成五平台或全部无损。用于后续并发与取消代表样本。"],
+     ["其余源族", "以同一提交的CreateLatest.py版本表为候选池", "按语法/API覆盖增选，不全量抓取混淆脚本，也不把19个源一律当可用或已获执行许可；下架源不恢复到候选池。"]
+    ]} />
+    <Text>样本冻结记录应包含仓库commit、路径、脚本@version、Git blob及未来采集时计算的文件SHA-256；Git blob不是文件SHA-256，也不是独立签名背书。未来对比先校验字节，main或代理返回不同字节不得静默替换。样本中自带的认证/请求头常量不复制到原生客户端、报告或日志；宿主只按受控脚本契约代理，不能把共享常量当应用自有密钥。</Text>
+    <LinkCards links={[
+     { title: "参考仓 README：在线导入、维护说明、项目链接与下架告警", href: "https://github.com/pdone/lx-music-source/blob/07dca9589e3734b140ec4ef396ee29dfe63687a2/README.md", site: "仓库作者声明 · 固定快照" },
+     { title: "版本与latest生成规则（未执行）", href: "https://github.com/pdone/lx-music-source/blob/07dca9589e3734b140ec4ef396ee29dfe63687a2/CreateLatest.py#L14-L35", site: "静态源码" },
+     { title: "Huibq 1.2.0：小型样本的宿主调用和能力声明", href: "https://github.com/pdone/lx-music-source/blob/07dca9589e3734b140ec4ef396ee29dfe63687a2/huibq/1.2.0.js#L11-L88", site: "本轮仅静态阅读 · 不代表验证可用" },
+     { title: "QingLiang 2.1.0：后续候选，未读取脚本内容", href: "https://github.com/pdone/lx-music-source/blob/07dca9589e3734b140ec4ef396ee29dfe63687a2/qingliang/2.1.0.js", site: "仅核对目录元数据" },
+     { title: "健康检查工作流（本轮未触发）", href: "https://github.com/pdone/lx-music-source/blob/07dca9589e3734b140ec4ef396ee29dfe63687a2/.github/workflows/health-check.yml#L1-L18", site: "01:00北京时间计划；不是实车认证" },
+     { title: "下架源的维护提交与作者说明", href: "https://github.com/pdone/lx-music-source/commit/07dca9589e3734b140ec4ef396ee29dfe63687a2", site: "作者安全声明 · 本轮未复现" }
+    ]} />
+   </Section>
+   <Section heading="可执行的对照验收矩阵（确认后实施，当前均未运行）">
+    <Table columns={["维度", "样本 / 对照步骤", "放行口径"]} rows={[
+     ["客户端差异", "固定Huibq样本：旧Mobile基线与新lx.env=mobile；静态区分其非mobile日志分支。其他样本逐一提取env/Node依赖。", "以Mobile为主，不因desktop能导入就算通过；不为桌面分支开放Node权限。每个样本记录宿主版本/脚本摘要。"],
+     ["导入 / 初始化", "同字节脚本分别导入；on(request)注册、inited单次、sources过滤、重复初始化/语法失败。旧版使用干净测试配置，不读取用户旧数据。", "能力集、Promise与错误结果可对照；不得把脚本下载成功当初始化成功。"],
+     ["宿主API / 时序", "先假HTTP离线验证request回调、env/version、Promise、定时器；crypto/Buffer用第4节合成向量补齐，Huibq未使用不代表无需支持。", "Mobile最低契约不回归；不支持API清楚拒绝，无跨曲/跨源迟到回调。"],
+     ["平台 / 音质", "Huibq按五平台×128k/320k建用例；其FLAC/24bit只验明确“不支持”，不强造成功结果。QingLiang先提取真实声明再扩表。", "只对源声明与宿主交集测试成功路径；质量降级/跨源可见，缺能力不算服务宕机。"],
+     ["URL解析", "用脱敏musicInfo固定hash/songmid/type；假响应覆盖成功URL、缺字段、非HTTP(S)、过长URL、业务错误码；之后才允许有限真实解析。", "返回语义/错误分类一致，过期URL不永久复用；业务限流与宿主失败分开计数。"],
+     ["超时 / 取消", "注入延迟、断网、切源、快切曲、取消与成功同到；QingLiang是否内部并发待静态审查，宿主并发先用合成源测试。", "统一会话预算、真实底层取消、只完成一次；旧版空取消视作待修缺陷，不要求复制泄漏。"],
+     ["失效 / 安全", "假响应覆盖403/429/非JSON、源失联、失效版本/重复初始化、引擎超限/崩溃；用无害探针测试越权拒绝。", "可诊断、有限重试/回收，不默认自动换滚动脚本，不执行已下架恶意逻辑。"],
+     ["媒体播放", "先本地授权音频＋假源URL验证Media3首声/seek/队列/焦点；获准后才将固定样本解析URL送入受控播放，记录链路时间和失败点。", "旧Mobile基线与新兼容层分别报告：解析成功≠可解码≠可听首声；API21/22、手机实际系统和Android12 BYD实车分别报告。"],
+     ["结果分层", "每条保存作者声明、静态判读、旧基线运行、新层运行、真实服务/实车结果五栏；本轮仅前两类有有限证据。", "状态用通过/宿主不兼容/源服务失效/不适用/未测；不得把未测写成通过或100%兼容。"]
+    ]} />
+   </Section>
+  </Section>
+
+  <Section id="p6" heading={heads[5]}>
+   <Sequence actors={[{ id: "u", label: "UI/系统命令" }, { id: "s", label: "原生播放服务" }, { id: "r", label: "仓储/音源代理" }, { id: "p", label: "Player/会话" }]} messages={[
+    { from: "u", to: "s", label: "播放TrackId，附命令序号" },
+    { from: "s", to: "r", label: "读队列/质量/缓存；新建session并取消旧解析" },
+    { from: "r", to: "s", label: "本地URI或源返回URL＋有效性信息", reply: true },
+    { from: "s", to: "p", label: "代次仍有效才setMediaItem/seek/prepare/play" },
+    { from: "p", to: "s", label: "实际状态、错误、position、metadata事件", reply: true },
+    { from: "s", to: "u", label: "revision状态快照 / 歌词当前行", reply: true },
+    { from: "s", to: "r", label: "队列事务与低频checkpoint" },
+    { note: "解析成功、Buffering、位置推进、可听首声分开记录；不再用静音占位判断真实曲目播完。" }
+   ]} />
+   <NumberedList items={[
+    "启动：首次仅创建新版默认配置和空库，不读取旧版数据；进入普通手机自适应UI，车机模式默认关闭且可手动启用。后续恢复本机新版状态和手动模式选择，不隐式同步另一设备。列表按需分页，网络不阻塞界面。",
+    "窗口变化：手机旋转、系统栏/键盘变化、BYD全屏与系统3:7双分区的30%区/70%区切换，仅调整同一UI状态的排版；歌曲、队列、进度和媒体会话不重建。比例已明确，运行时窗口可用尺寸与断点仍需实车校准。",
+    "点歌：统一队列协调器选曲、音质和临时队列；稳定TrackId/EntryId代替仅保存列表下标。每次play/next/stop/换源递增代次，旧解析回调只可丢弃不能改现曲。",
+    "解析：本地有效URI优先；URL缓存绑定sourceId、脚本摘要、质量和可用期；无expiresAt的源使用保守策略，不能假设永久有效。保持跨源匹配能力并标明候选版本差异。",
+    "失败：限流、断网、URL过期、解码、权限、引擎崩溃分型；拟定一个播放会话总预算和有限退避，网络恢复事件触发再试。最终数字在兼容阶段冻结，避免原有多层重试叠加。",
+    "音频：Media3管理解码、缓冲、焦点与becoming-noisy；是否duck/暂停/恢复依据配置和用户主动暂停意图。MediaSession接收系统媒体命令，命令进入同一协调器；方向盘是否映射为标准媒体键必须实车验证，不假设存在通用私有CAN接口。",
+    "歌词：统一时间轴以Player.position＋单调时钟推算，seek/倍速/缓冲边界重校准；UI按行/必要逐字变化更新，不逐帧全页重组。整词换曲发一次，行窗口按变化发，保留迪链协议兼容。",
+    "持久化：队列修改事务提交，遵循“保存播放进度”开关；启用时播放中拟每5秒checkpoint，暂停/停止/服务边界补存；关闭时不强行恢复原位置。进程突然死亡可能丢最后checkpoint窗口，存储失败另报，不承诺断电瞬间一定能执行flush。",
+    "自启：bootAutostart与startupAutoPlay仍独立；关闭则无任务，开启但不自动播放只恢复就绪，需要自动播放才尝试原曲。无历史不随机选歌；有截止/去重/取消，不弹主界面。"
+   ]} />
+   <Text>开机策略必须按OS版本与targetSdk制定：minSdk21不等于targetSdk21，也不等于继续固定旧target29。Android15且target35+对BOOT_COMPLETED启动mediaPlayback前台服务有限制，不能从Android12 BYD车机的可行路径推导为所有手机和系统通用；手机也不默认要求自启保活。阶段1确定目标SDK和分版本实现；受系统禁止时明确显示受限状态、等待用户/合法媒体恢复入口，不能用绕过限制的“保活”手段。</Text>
+   {cite("boot", "media", "fields", "background", "fgslimit")}
+  </Section>
+
+  <Section id="p7" heading={heads[6]}>
+   <Text>以下“保留”指产品功能重实现，不指读取/转换旧版用户数据。按最新决定，旧歌单、历史、进度、配置和旧格式导入兼容不再是验收要求；新版自己创建的数据仍须安全持久化。除这项明确排除外，既有功能仍是首个正式原生版门槛，不能静默砍成MVP。</Text>
+   <Table columns={["现有能力", "原生重实现要求", "验收/边界"]} rows={[
+    ["手机竖屏 / 横屏", "普通模式完整可用：小屏单列/分层导航，大屏或横屏按可用宽度分栏；搜索输入/键盘、返回手势、迷你播放栏与播放详情衔接。", "旋转/恢复不丢输入、列表位置、队列或歌词定位；无横屏专用缺页；手机横屏不自动开车机模式。"],
+    ["手动车机模式", "独立显式开关，默认关闭，支持记忆；大触控目标、简化播放操作、横屏宽窗排版；窄窗紧凑适配，始终有退出车机模式入口。", "不按BYD/厂商字符串强切；模式与当前窗口大小独立，手机也可手动试用；不会触发另一台设备模式变化。"],
+    ["BYD系统3:7双分区", "只有两个区：30%区与70%区。应用有全屏、占30%区、占70%区三种窗口状态；各状态按实际窗口/insets布局。", "不是三/七个窗口，不是任意比例；占30%区也能操作和退出设置，不截断关键控件，切换不重建音频/会话。比例已明确，仅精确尺寸和断点待校准。"],
+    ["应用内部歌词/封面布局", "原车机宽窗内歌词/封面7:3视觉关系与系统3:7分屏是两个概念；在足够宽的窗口保留，窄区可重排为紧凑布局。", "不把应用内比例当系统窗口比例，也不把30%窄区机械地再拆成不可用小列；排版断点由可用dp与触控验证确定。"],
+    ["BYD Dock、5秒共同显隐", "车机设置/控制栏共用idle状态机；弹窗暂停计时，触控共同出现。56dp作为当前BYD设计预留依据，实际是否已由窗口排除需测量。", "density1.5时56dp=84px；整屏理论1280×656dp，不是固定可用区。用运行时WindowMetrics/兼容测量与insets处理system bars/Dock，不重复扣除，也不在手机硬塞56dp。"],
+    ["播放页磅字号无上限", "保留1磅步进、最小1、无上限、长按、重置、横竖独立和默认磅单位；保留当前/邻近行比例。", "“磅”为应用约定单位，映射保持视觉一致，不擅自改物理pt；超大字号用布局/虚拟化保证不崩，不加隐藏上限。"],
+    ["悬浮歌词外观", "背景色/透明度/圆角、边框色宽、当前/其他行颜色字号、字距、粗体、空心/描边、对齐、标题独立样式、窗口宽高/行数。", "按默认设置逐键映射；不同屏幕密度校对，不用简化两行歌词替代。"],
+    ["悬浮歌词交互/多屏", "显示开关、拖动位置、锁定、单行/多行、切换动画、显示器选择与位置恢复、亮灭屏恢复。", "权限拒绝/撤销、display丢失有降级说明；保持界面入口和原有交互，实车逐项对照。"],
+    ["媒体会话与蓝牙歌词", "播放/暂停/上下首/停止/seek、通知封面设置、标准与BYD歌词键、整词/三行窗口、蓝牙标题歌词开关。", "不能假设Media3 extras会自动映射旧PlaybackStateCompat键，需桥接/必要受控适配并在迪链验证。"],
+    ["开机与自动播放", "两个独立开关、默认关闭、后台就绪不弹UI、新版自身记录恢复、有限重试与取消、可诊断状态。", "四组合＋重复广播＋手动打开/取消；不以Buffering当可听成功。"],
+    ["歌单/收藏/队列", "默认/喜爱/自建列表、批量增删移动排序、多选、稍后播放、播放模式、随机历史、不喜欢规则、列表滚动/选择记忆。", "稳定ID、事务、分页；1万首仍保持同样操作语义。"],
+    ["搜索/歌单/榜单/评论", "五平台元数据协议与单源/聚合检索、分页、搜索提示/历史开关、歌单分类详情和评论视图迁为Kotlin。", "各平台能力按当前源码提供，不宣称每平台所有接口都可用；慢源分批展示/失败可辨。"],
+    ["音源导入/切换/管理", "本地/在线导入、脚本元信息、选择/删除、更新提示开关、诊断日志；原文件继续可用。", "以固定参考样本验证Mobile兼容；不默认捆绑或自动替换脚本，不因未提供私人文件阻塞规划。"],
+    ["音质与失败换源", "保留128k/320k/flac/flac24bit能力协商、候选源搜索、URL刷新与失败提示。", "匹配版本可追踪，不承诺跨平台一定同母带；原重试功能保留，但改为统一有界预算。"],
+    ["本地音乐", "目录选择/持久授权、扫描、元数据/封面/内嵌歌词、列表导入、有效本地文件优先与失效反馈。", "USB/权限变化、损坏文件和大库；新包必须重新获取URI授权，不可复制授权字符串冒充可访问。"],
+    ["歌词功能", "时间轴/滚动/手动定位、翻译/音译、简繁开关、已有歌词进度调节显示、倍速校准和无歌词状态；不读取旧editedLyric数据。", "以原入口逐项对照；仅找到editedLyric存储函数不足以证明已交付完整歌词编辑器，不把新编辑器算作已有必保功能；同样区分逐字数据与逐字显示。"],
+    ["播放设置与缓存", "音量/倍速、保存进度、启动打开播放页、定时退出、焦点/audio offload设置、通知封面、缓存大小/清理、下一曲预热。", "新版从新缓存开始，不读取旧音频缓存；流缓存不等于下载文件；offload与倍速的互斥/硬件支持清楚提示。"],
+    ["列表工具/外部入口", "保留新版列表主动导入/导出与分享、deeplink、音乐/源文件入口；新版格式自行版本化，不要求旧lxmc或旧配置兼容。", "不将旧版歌单导入设为迁移门槛；用户主动操作与自动读取旧数据分开，导出失败不得报成功。"],
+    ["源歌单更新", "保留用户主动触发的原有源歌单内容更新、变更反馈与取消。", "单设备列表能力，不自动等同于手机与车机同步；旧数据迁移仍排除。"],
+    ["主题/语言/基础设置", "保留夜曲/白昼、已有主题、背景/字体阴影/语言设置、状态栏/返回退出/导航偏好和协议说明；不凭字体资源文件推断有任意字体选择器。", "原设置逐键列映射、保留/替代/不再适用项都需说明；不能只迁播放页。"]
+   ]} />
+   <Table columns={["可选模块（不默认开启/承诺）", "范围与边界"]} rows={[
+    ["既有LX同步协议适配", "v4配对、列表/不喜欢同步与合并/覆盖选择可作为独立模块保留设计，另行确认启用并验证现有服务互通。双场景不代表手机与车机自动双向同步、实时接力、云账号或共享播放进度；基础使用不依赖同步服务。"],
+    ["双设备联动新增需求", "自动发现/直连、账号共享、跨设备接力与实时状态协调不在当前承诺；需要再定冲突、网络、权限、安全和用户意图，不能从两台设备使用推导已批准。"]
+   ]} />
+   <Text>新增可选、默认不纳入：完整下载任务与离线包、所有设置/脚本/密钥的一键全量备份、应用内语音搜索、均衡器/ReplayGain/交叉淡入淡出、完整Android Auto/AAOS浏览模板、云账号。旧版数据快照/转换/导入工具已撤出范围。新版自身事务恢复仍属基础安全；产品化完整备份继续为可选新增，不默认批准。</Text>
+   {cite("car", "idle", "font", "defaults", "fields", "patch", "local", "sync", "backup")}
+  </Section>
+
+  <Section id="p8" heading={heads[7]}>
+   <Table columns={["边界", "按最新决定执行的方案"]} rows={[
+    ["从空数据开始", "不实现旧RN存储读取器、AsyncStorage格式兼容、播放历史/队列/进度/歌单/收藏/设置/歌词缓存的转换，也不自动恢复旧源选择、身份与配对；初次创建新版默认配置、空库与新缓存。"],
+    ["不删除旧数据", "不迁移不等于卸载、清除数据或清旧目录；本轮及未来默认安装流程都不自动删除用户旧版数据。旧版能否继续使用与应用安装身份另行处理。"],
+    ["推荐并行测试", "独立applicationId测试包，名称/图标/更新通道与旧版区分（具体ID未创建）；旧包继续安装，避免两者同时自启抢播。测试包只访问自身库，音源由主动导入建立，文件/USB权限重新取得。"],
+    ["正式安装身份", "正式applicationId、签名与是否长期并行待发布阶段确定；不因取消数据迁移就预设必须同包覆盖。跨包无法直接读取旧私有数据，本方案也不尝试这么做。"],
+    ["若最终同包覆盖", "仍须相同applicationId、兼容的实装签名及递增versionCode；仅创建独立命名的新数据文件，不读取/覆盖/清除遗留数据文件。该路径不承诺新旧状态互通；选择前说明覆盖后的安装/回退限制。"],
+    ["ABI与版本号", "旧分ABI为基础versionCode×1000＋ABI编号，universal不同；若选覆盖，必须检查各实装包型，不能只递增基础数字。错签/错ABI必须明确拒绝，不以卸载作为自动解决步骤。"],
+    ["回退边界", "并行安装时可停止测试包并切回旧应用；同包覆盖后正常Android安装不能直接降versionCode，不能承诺旧APK一键回退。是否需较高versionCode恢复构建属发布预案，不包含新旧数据库逆向转换。"],
+    ["新版自己的数据安全", "Room事务、稳定ID、分页与单写入所有者；进度保存遵循开关；空间不足/进程终止时保持已提交数据。Room与DataStore不共用事务，采用可恢复提交顺序；后续新版schema演进不能静默丢数据，不使用破坏性重建兜底。"],
+    ["备份与同步", "新版自身完整备份仍是可选新增，不默认加入；已有列表工具按第7节重实现；同步独立列为可选模块，不因双场景默认承诺，不构成旧数据迁移要求。不自动配对旧服务，不读取或导出旧密钥。"]
+   ]} />
+   <Text>“保留功能”与“保留旧数据”分离：新版可继续有收藏、队列、历史/进度恢复等单设备功能及另行确认的可选同步模块，但只对新版创建或用户之后主动加入的内容负责。首次没有新版播放记录时不自动随机点歌。旧数据盘点、旧格式测试快照、迁移日志、旧单位换算、导出桥接、逆向转换及其验收门槛全部取消。</Text>
+   {cite("appid", "appdata", "updates", "migration")}
+  </Section>
+
+  <Section id="p9" heading={heads[8]}>
+   <Text>没有日期或工期承诺；规模描述风险面，不是砍功能理由。旧数据兼容/迁移工作已撤出，G0已获批准，当前执行G1/G2。已有参考仓可准备样本；真实脚本仅在静态审核与安全运行环境达标后测试，不能在宿主Node/裸JVM直接eval。没有安全环境时仅执行合成契约与静态检查，gate不冒充通过。</Text>
+   <Table columns={["阶段/规模", "前置与交付物", "进入下一阶段的门槛"]} rows={[
+    ["G0 · 双场景方案确认", "本Page、手机＋BYD双场景与手动模式、系统3:7双分区三种窗口状态、空数据、API21及参考源矩阵。",  "已获用户开发授权；仅本地隔离开发/测试，不授权发布或安装到用户设备。"],
+    ["G1 · 契约/依赖/样本冻结 · 中", "确认后冻结依赖/工具链与许可，覆盖API21窗口兼容与所需ABI；为pdone样本固定摘要/权限及离线规范；确定手机尺寸矩阵、BYD三状态测量口径，不开发旧数据读取器。", "minSdk仍21；共享核心可行；已下架源排除。手机型号未知不阻塞准备，API/ABI与实机待测项明确标记。"],
+    ["G2 · 音源兼容PoC · 大", "合成离线测试→固定参考样本旧Mobile基线/新兼容层对照→受控且获准的真实解析；验证隔离、中断、取消、crypto与URL错误。旧基线使用干净测试配置。", "第5节Mobile相关契约全部有结果；已审样本不改字节，宿主不兼容不得以换源掩盖；源服务失效单列，不能算兼容通过。出报告再确认全面重构。"],
+    ["G3 · 原生播放/新数据核心 · 大", "唯一会话/队列、Media3、Room/DataStore新库、设置/IPC、断网/焦点/生命周期和新版自身checkpoint。", "空库正常使用，完全不读取旧数据；假源/本地音频通过，进程死亡可恢复新版已提交状态，迟到回调不串曲。"],
+    ["G4 · 双场景功能重实现 · 很大", "共享核心上完成手机竖/横屏、手动车机模式、BYD全屏/30%区/70%区排版；完成平台、歌词/悬浮、列表/收藏、文件入口；同步另列可选，不含旧数据兼容。", "手机是完整使用场景而非车机附赠页面；模式切换/旋转/窗口切换不中断播放；两场景保留项均无未说明缺口，内部包不接稳定源。"],
+    ["G5 · 手机＋实车验证 · 大", "API21/22兼容环境、小/大屏手机与多版本模拟测试，手机实机后补；Android12 DiLink5.0 arm64-v8a实车测全屏/30%区/70%区、媒体键/休眠/焦点；分别采性能。", "两场景按各自设备口径验收；模拟器不冒称实机。手机型号后补不阻塞规划，但实机缺测项在发布记录可见；BYD比例无需再确认，只校准有效尺寸/断点。"],
+    ["G6 · 安装/更新/新存储安全 · 中至大", "并行安装、正式包名/证书决策、ABI/versionCode、错签/损坏包拒绝；新版库大数据、空间不足、事务中断和恢复。", "不读取/删除旧数据；新库安全可恢复；官方更新与所选安装/回退预案成立。不设旧数据数量对账或转换门槛。"],
+    ["G7 · 发布候选与发布确认", "SBOM/许可、证书与清单校验、完整测试记录、限制说明、旧版保留安排。", "单独批准发布前，不覆盖master、不切稳定源、不安装到用户手机或车机、不发正式版。"]
+   ]} />
+   <Text>停止条件保留：必须提高minSdk、Mobile宿主契约存在未闭合差异、只能靠不安全权限运行源、既有功能无法重实现、正式签名身份不明、新版自身存储可能丢失已提交数据。旧数据缺失或旧格式不兼容不再是停止条件；参考服务失效则报告为外部故障，不带着“已验证兼容”结论推进。</Text>
+  </Section>
+
+  <Section id="p10" heading={heads[9]}>
+   <Section heading="性能预算：目标，不是本轮结果">
+    <Text>以下具体数值沿用前版作为BYD主车的初始设计目标，并非已测结果或从“可用内存2837MB/存储127068MB”推导。两项可用量会变化，不代表总量、PSS可独占额度或可占满的缓存。手机具体硬件未知，先按同口径采集p50/p95、jank与长测，实机后补独立预算，不直接套车机阈值。</Text>
+    <Table columns={["指标", "拟定目标和口径"]} rows={[
+     ["冷启动可交互", "Android12 BYD主车（实际API待核对）、新版空库与典型新版库分别采集：进程冷启动到首个可操作主界面p50≤1秒、p95≤1.5秒；首次安装另报，不混算。至少30轮，记录设备热状态。"],
+     ["本地首声", "预先验证可读的本地文件：已就绪服务点播到可听首声p95≤500ms；进程冷启动点播p95≤2秒。Player Playing/position推进与真实音频采集分开统计。"],
+     ["线上首声", "拆为排队/脚本执行/解析服务/连接/缓冲/音频输出；受控LAN假源和本地音频设硬预算，真实公共源只报p50/p95/失败率及网络条件，不给不可控网络硬承诺。"],
+     ["歌词与列表", "若设备60Hz，以16.7ms为帧预算；120秒场景jank比例目标<1%，无连续明显冻结；应用自有主线程任务不超过100ms。以实际vsync和FrameMetrics口径为准。"],
+     ["内存", "主UI＋播放＋脚本所有进程合计PSS：稳定p95目标≤240MiB，阶段峰值≤320MiB；2小时固定场景后相对稳定基线增长≤20MiB且无持续单调增长。脚本超额需可诊断，不通过删功能达标。"],
+     ["大歌单", "100/1000/10000首分别测；首屏分页不随总行数全量挂载，单条收藏/移动不重写全库，后台批量导入不阻塞播放/触控；1万首首屏p95目标≤500ms（服务/DB已就绪）。"],
+     ["续播点", "启用保存进度时，拟5秒checkpoint＋边界flush；非正常终止恢复位置目标误差≤6秒（可seek音频，排除突发存储失败），记录未达标原因；不承诺每次断电都能执行收尾。"],
+     ["取消与泄漏", "取消后该会话不得新增HTTP请求/写现曲状态；引擎CPU中断和进程回收有截止；UI反复开关50次后监听/连接/定时器回到稳定数量。"],
+     ["后台", "暂停、息屏、断服同步分别测30分钟；没有无意义高频轮询、无无限唤醒锁；同步退避有上限/暂停条件，电流在相同电源状态下对照。"]
+    ]} />
+    <Text>这些是确认后冻结的初始验收目标，不是已证明收益，也不宣称相对RN降低多少。若阶段1发现硬件/引擎真实约束，需要用数据提出修订并确认，不能在测试失败后悄悄改口径。API21/22以可用性、正确性、无崩溃为硬门槛，性能按具体设备独立建基线，不能直接套主车数字；手机后台节能、旋转、耳机/蓝牙与车机休眠需分别测，不假设Android12显示信息证明其他版本行为。</Text>
+   </Section>
+   <Section heading="手机 / BYD功能与竞态矩阵">
+    <Table columns={["维度", "必须覆盖的组合"]} rows={[
+     ["系统/安装", "API21/22兼容基线＋代表性Android手机模拟环境，小屏/大屏；手机实机/系统/ABI后补。BYD Android12、DiLink5.0、arm64-v8a实车另列，SDK_INT待核对。release包两场景分别记录，不能把一种设备通过当另一种通过。"],
+     ["手机UI", "竖屏/横屏、旋转中搜索输入、IME弹出/收起、返回手势/导航、系统字体/显示缩放、刘海/手势insets；后台重建恢复列表/歌词，音频与会话不断。"],
+     ["手机后台/音频", "锁屏/通知媒体控制、任务划掉/后台限制、来电/闹钟/其他媒体焦点、有线耳机拔出与蓝牙连接/断连/切路由；主动暂停不被自动抢播，记录省电策略限制。"],
+     ["开机/休眠", "boot开关×startupAutoPlay四组合、无历史/本地/在线、广播重复；息屏与真正待机分开，记录进程是否存活，后台被杀/服务重建/解锁前后。"],
+     ["取消竞态", "快切20首、同曲不同音质、切源中退出、响应在取消后返回、Promise/定时/HTTP同时完成、脚本崩溃、Binder死亡重连。"],
+     ["弱网/恢复", "无网1–5分钟、Wi-Fi/蜂窝切换、DNS失败、TLS/403/429/过期URL、慢响应/大响应；重试预算、恢复原曲及用户主动暂停意图。"],
+     ["音频焦点", "导航提示、电话、语音助手、其他媒体；duck/短暂/永久丢焦点，耳机/输出路由改变；不抢回主动暂停，不双音轨。"],
+     ["按键/媒体卡片", "方向盘上下首/播放暂停/长按、通知/锁屏/蓝牙、媒体应用切换；迪链完整歌词与三行字段、seek/倍速/换曲不串词。"],
+     ["BYD窗口/悬浮", "1920×984px、density1.5/240dpi，仅三种应用状态：全屏、系统3:7双分区中占30%区、占70%区；切换时测实际WindowMetrics/insets。应用内部歌词/封面7:3与系统比例分开；56dp Dock按真实占用处理；5秒同隐、超大磅字号、多屏/权限撤销。"],
+     ["模式与资源快照", "手机/车机手动开关默认/记忆/退出入口；横屏不强切、厂商字符串不决定模式。记录各轮实际可用内存/存储、温度及并发应用；不以2837MB/127068MB当稳定实验条件或物理容量。"],
+     ["数据", "1万首、重排/删除当前曲、扫描USB断开、持久URI授权失效、空间不足、事务kill；可选同步模块若获准，则另测本地/远程同时编辑及v4合并/覆盖，不设默认手机↔车机自动同步验收。"],
+     ["新存储/发布", "空库起步、不读不删旧数据；新版自产生的收藏/队列/配置/进度在重启后正确恢复；并行安装、所选正式签名/包名、错签拒绝、ABI、损坏APK与降级限制。不验证旧数据迁入。"]
+    ]} />
+    <Text>采集方法：Macrobenchmark/帧测量工具须选仍支持API21的版本，手机与主车按系统可用性采用Perfetto/System Trace或旧版追踪工具、meminfo、media_session与受控网络统计；测量框架可在支持的较新API上采性能，不能反过来抬应用minSdk。公开报告对脚本、URL、歌单和配对参数脱敏，所有时间标注北京时间UTC+8。</Text>
+   </Section>
+  </Section>
+
+  <Section id="p11" heading={heads[10]}>
+   <NumberedList items={[
+    "许可证：原仓Apache-2.0，保留版权/许可证/NOTICE等适用声明，标注修改；QuickJS官方为MIT，但具体wrapper、字体、图标、转写后的SDK和所有传递依赖逐项核查，形成SBOM与第三方许可页。原仓许可证不自动授予音乐内容或其他平台商标使用权，也不覆盖pdone收集的第三方脚本；该参考仓未识别出统一许可证，逐源授权未核实前不随包分发。",
+    "源文件：不内置、分发或后台下载未授权源；用户音源只在其明确启用后执行。脚本原文与配对身份不进入遥测/崩溃日志；新增域名或不安全HTTP例外可见、可撤销。",
+    "签名：正式构建缺预期密钥/证书即失败，不允许debug签名降级。密钥由安全签名环境持有，不向聊天或仓库提交私钥；测试签名与正式身份清楚区分。",
+    "更新信任：下载后校验大小、SHA-256、包名、versionCode、ABI与预期签名证书；摘要若与APK来自同一可篡改清单，只证明一致性，不提供独立真实性。采用可信签名清单/钉住发布身份，证书轮换另有审计流程。",
+    "发布控制：原生测试包不接旧稳定更新源，正式切换分发渠道须单独批准；保留可下载旧APK和恢复说明，但不得把低versionCode旧包当一键回滚保证。",
+    "测试体系：协议黄金样本/crypto向量、domain状态机、新版自身存储事务/后续schema演进、IPC/进程死亡、API21 lint/集成、Compose/View截图和触控、Media3本地/假源、手机旋转/后台/耳机蓝牙、BYD全屏/30%区/70%区回归；同步v4仅在可选模块获准时验证。master PR和发布tag都要门禁。",
+    "依赖维护：锁文件与制品校验、防动态版本漂移、固定JNI ABI/NDK兼容、现代系统页大小要求评估；选择旧兼容线意味着承担后续安全修复责任，不得以“固定版本”代替漏洞监控。",
+    "旧版维护：在原生正式验收前保留现有稳定版；其紧急缺陷修复必须单独授权，不和重构顺带发版。不再安排旧数据转换或迁移支持窗口；旧版保留与何时结束维护另行确认，不自动清其数据。"
+   ]} />
+   {cite("license", "deps", "engine", "updates", "migration")}
+  </Section>
+
+  <Section id="p12" heading={heads[11]}>
+   <Table columns={["集中决策项", "默认项 / 已决定 / 仍待验证"]} rows={[
+    ["D1 · 用户最新决定", "不考虑旧版数据兼容及迁移；从空库开始，不读取/转换旧历史、队列、进度、歌单、设置等。不自动卸载或清除旧版，已写入范围和阶段验收。"],
+    ["D2 · 双场景明确", "Android手机与BYD车机共享Kotlin核心、LX音源层与自适应UI；minSdk21不变。手动车机开关，不按厂商品牌强切。BYD系统3:7只有30%/70%两个区，应用验收全屏/30%区/70%区三种状态。"],
+    ["D2a · 设备参数口径", "Android12/DiLink5.0/arm64-v8a、1920×984、density1.5（240dpi）作为车机输入；2837MB内存/127068MB存储仅当次可用量。手机型号未知不阻塞规划，实机后补；窗口有效尺寸和断点运行时校准。"],
+    ["D3 · 音源参考已就绪", "采用pdone/lx-music-source固定快照与首批样本矩阵；无需额外追问文件才能规划。作者声明、源码静态证据、未来旧Mobile/新层运行结果严格分列。"],
+    ["D4 · 开发已获批准", "先G1/G2兼容gate；box已有本地代码与检查结果已保留，按最新指示交给Cursor云端隔离分支续做，避免双写。不重试gh OAuth；完整客户端须gate实际达标后推进，不包含发布/覆盖安装/改master。"],
+    ["D5 · 安装与发布", "建议独立测试包并行、旧版保持原状；正式applicationId/签名/是否覆盖在G6确定。不要把无迁移理解成现在授权卸载、改包或清数据。"],
+    ["D6 · 未决新增", "同步模块/手机与车机联动单独可选，不承诺自动双向同步；完整下载、新版完整备份、语音、音效、Auto/AAOS仍需另批，不自动捆绑音源。"]
+   ]} />
+   <Text>仍待验证的是完整API21依赖闭包、引擎/JNI及隔离实现、逐样本实际Mobile兼容/服务状态、手机旋转/后台/耳机蓝牙行为、BYD媒体/休眠及三个窗口状态、两场景各自性能和最终发布证书。它们是后续技术验证项，不是需要用户继续补材料才能完成规划的前置问答。旧数据迁移不再出现在工作或发布门槛中。</Text>
+   <Callout lead="当前任务：保留box成果，交给Cursor云端续做gate">开发授权有效，但执行位置已切换。云端先核对交接包和固定源码契约，再补齐安全宿主桥、合成回归及Android验证，不能把现有编译与宿主冒烟检查当真实音源兼容通过。原软件、旧数据、master和稳定更新源保持不变。</Callout>
+   <Section heading="box交接快照｜2026-11-24 北京时间UTC+8">
+    <Text>本地隔离worktree：/workspace/lx-native-compat-20261124；分支native/compat-gate-20261124；HEAD仍为2571ea373c2ab811dbb6834bf5cdd42a0d624291（新增文件尚未commit），与审查基准对应tree为d48c9ebb8fd79f926e7ed4c325f98bbbf32aba56。原RN worktree仍干净，未修改master、未推送。交接包位于/workspace/lx-native-handoff/lx-native-compat-handoff-20261124.tar.gz。</Text>
+    <Table columns={["实际项目", "已完成的有限结果", "不能据此声称"]} rows={[
+     ["Kotlin核心初稿", "bounded JSON、Base64/旧crypto适配、网络策略模型与取消/代际ledger；Kotlin2.1.20/JDK21编译exit0，输出compat-core.jar。", "尚未有宿主事件桥、传输实现或契约自动回归；编译不等于功能正确或API21验证。"],
+     ["QuickJS宿主验证runner", "固定QuickJS2026-06-04，core C编译exit0；不链接quickjs-libc，不暴露Node/Java。Linux namespace、seccomp与资源限制的3项合成冒烟通过：危险宿主globals缺席/Promise、死循环中断、内存超限终止。", "仅Linux宿主候选，不是Android/JNI实现；缺少宿主IPC墙钟watchdog与完整broker，仍禁止接入真实第三方脚本。"],
+     ["音源样本", "Huibq1.2.0固定blob与SHA256并完成静态阅读；外部样本留在独立参考目录，不放入交接包或App资产。", "第三方音源执行0次、真实源网络请求0次；未完成旧Mobile与新宿主对照。"],
+     ["Android与发布", "box已检查JDK21，未配置Android SDK/NDK；保留API21硬约束。", "没有APK；arm64/API21、依赖完整闭包、Media3、手机/实车播放均未验证。"],
+     ["gate结论", "G1部分实现；G2未通过。具体命令与原始结果在native-compat/reports/handoff-checks.txt。", "不进入完整客户端重写或发版，不宣称性能收益、100%兼容或安全审计完成。"]
+    ]} />
+    <Text>交接包仅含新工程文本源码、baseline preload及许可证、固定构建工具摘要、补丁、宿主契约与待办、测试日志和本方案快照；排除SDK/JDK、依赖缓存、编译二进制及含共享API key的第三方音源。云端继续从LuckyLearning/lx-music-mobile-bydcar的隔离分支核对并应用，保持API21、手机＋BYD、固定3:7两个分区、不迁旧数据及全部已交付功能的约束。</Text>
+   </Section>
+  </Section>
+ </Page>;
+}
+
+
+</cursor_untrusted_data_1337>

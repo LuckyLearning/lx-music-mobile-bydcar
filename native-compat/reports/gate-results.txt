@@ -1,0 +1,212 @@
+PASS json keeps bmp and emoji
+PASS json stringify roundtrip
+PASS integral doubles stringify as integers
+PASS duplicate JSON keys are rejected
+PASS json depth is bounded
+PASS json size is bounded
+PASS json trailing junk is rejected
+PASS base64 matches jdk encoder
+PASS base64 roundtrip
+PASS signed byte json
+PASS str2b64 is utf-8
+PASS md5 of a
+PASS md5 url-decodes percent
+PASS md5 url-decodes plus
+PASS md5 bad percent is empty
+PASS aes-cbc pkcs7 matches jdk pkcs5
+PASS aes iv is zero-padded to 16
+PASS aes mode AES with empty iv is ecb
+PASS aes ecb alias with an iv returns empty
+PASS aes bad key returns empty
+PASS rsa nopadding matches jca
+PASS rsa oaep matches jca
+PASS rsa unknown padding is empty
+PASS utility quota is not swallowed
+PASS pending cap does not consume the lifetime cap
+PASS cancel removes the ticket
+PASS lifetime cap remains after a rejected begin
+PASS late completion removes the ticket
+PASS reset makes an old ticket stale
+PASS unknown cancel is false
+PASS playback https is admitted
+PASS playback cleartext is rejected unless the caller lists the host
+PASS caller snapshot does not widen when the original set changes
+PASS script cannot add a playback cleartext host
+PASS playback rejects a loopback literal
+PASS late ticket key is retained until completion
+PASS cancel and complete cannot both apply
+PASS public ipv4
+PASS loopback rejected
+PASS rfc1918 rejected
+PASS link local and metadata rejected
+PASS cgnat rejected
+PASS documentation ipv4 rejected
+PASS multicast rejected
+PASS ipv6 loopback rejected
+PASS documentation ipv6 rejected
+PASS global ipv6 accepted
+PASS ipv6 loopback link-local and ula rejected
+PASS mapped ipv4 text is not parsed
+PASS leading zero ipv4 is not parsed
+PASS script transport rejects cleartext by default
+PASS script cleartext allowlist is a caller snapshot
+PASS script cannot widen its own cleartext allowlist
+PASS policy rejects loopback literal
+PASS policy rejects header injection
+PASS form body uses encodeURIComponent
+PASS form content type
+PASS json body is stringified
+PASS missing exact Content-Type still json-stringifies
+PASS formData is rejected
+PASS GET body is rejected
+PASS connector refuses private pins
+PASS connector refuses private pins
+PASS redirect is followed to the pinned second address
+PASS chunked body is reassembled
+PASS connector refuses private pins
+PASS redirect to a private address is not opened
+PASS mixed public and loopback answers are refused
+PASS connector refuses private pins
+PASS gzip body is inflated under the cap
+PASS connector refuses private pins
+PASS gzip expansion stops at the body cap
+PASS connector refuses private pins
+PASS second lookup of the same host is rechecked before another connect
+PASS connector refuses private pins
+PASS public ipv6 is the pinned peer
+PASS business success before 20s
+PASS business timeout message
+PASS result after deadline reports timeout once
+PASS source update fails pending requests
+PASS preload fixture matches the app asset
+PASS user-api sources are the mobile set
+PASS online script actions are musicUrl
+PASS lx identity stays mobile 2.0.0
+PASS built-in sdk owns search
+PASS xm is not an active built-in source id
+PASS outer bridge timeout is 20s and cancel hook is empty
+PASS formData branch reads form
+PASS default http timeout is 13s
+PASS html name decode
+PASS singer joiner follows decode
+PASS play time formatting
+PASS kw search url matches the legacy builder
+PASS kw search url is not fetched and is cleartext until the caller allows it
+PASS caller can scope that one host
+PASS kw search parser keeps qualities in source order after reverse
+PASS missing quality info fails the list
+PASS playlist urls are builders only
+PASS hot playlist tags keep id-digest
+PASS playlist tag groups keep the parent
+PASS phone portrait
+PASS planned byd full width
+PASS planned byd 70 percent pane
+PASS planned byd 30 percent pane
+PASS lyric step stays at least 1
+PASS lyric step has no upper cap
+PASS lyric step rounds then clamps
+PASS bad lyric value falls back
+PASS portrait phone stays vertical even in car mode
+PASS planned 30 percent pane uses car layout
+PASS wide car window uses car layout
+PASS wide phone without car mode stays horizontal
+PASS dock reserve is not added on top of a system inset
+PASS car mode reserves 56dp only when the inset is zero
+PASS phone does not invent a dock inset
+PASS boot does not play when autostart is off
+PASS boot does not play when launch autoplay is off
+PASS boot does not invent a track
+PASS boot plays only with both switches and a queue
+PASS planned car window keeps its pane
+PASS short wide window still has a full pane
+PASS narrow window is the 30 percent pane
+PASS car controls stay during the idle window
+PASS car controls hide at 5 seconds
+PASS open settings pause the car idle timeout
+PASS closing settings restarts the idle timeout
+PASS kg search keeps the parent and skips the group row
+PASS kg name, singers, qualities and duration match the sdk
+PASS kg play info keeps an https kugou url and the returned bitrate
+PASS kg play info rejects cleartext and a failed status
+PASS kg search url is https on songsearch.kugou.com
+PASS kw search body with SHOW 0 is not a result
+PASS kw search body parses through the existing row parser
+PASS tx parser keeps media id and skips empty sizes
+PASS wy parser follows the maxbr fallthrough and reverses
+PASS mg parser reads the nested result list
+PASS lyric cue parses minutes and fractions
+PASS lyric cue stays on the earlier line
+PASS lyric cue advances at the next stamp
+PASS local playlist roundtrip keeps the title and url
+PASS musicUrl request matches the original user-api shape
+PASS empty playlist text is an empty list
+PASS original musicSdk oracle runs
+PASS kg signature matches the original function
+PASS tx zzcSign matches the original function
+PASS mg createSignature matches the original function
+PASS wy eapi matches the original function
+PASS kg parser matches the original handleResult
+PASS tx parser matches the original handleResult
+PASS wy parser matches the original handleResult
+PASS mg parser matches the original filterData
+PASS kw parser matches the original handleResult
+PASS kg playlist rows keep the original quality order
+PASS original playlist parsers run
+PASS mg playlist list matches the original filter
+PASS mg playlist songs match the original filter
+INFO watchdog exit=137 elapsedMs=405
+PASS parent watchdog kills a silent child
+PASS runner stays up before setup
+PASS lx version env and script info
+PASS hostile globals and dynamic code are absent
+PASS console output is not copied out
+PASS native entry rejects the wrong key
+PASS script exception is rejected without the message
+PASS init status
+PASS kw intersection drops lyric search and hires
+PASS kg keeps the quality intersection
+PASS local actions stay and online qualities do not apply
+PASS xm and non-music tx are absent
+PASS musicUrl https is accepted by preload
+PASS preload still accepts a cleartext musicUrl string
+PASS player policy rejects that cleartext string until the caller allows the host
+PASS the musicUrl string itself is unchanged
+PASS lyric boundaries match preload
+PASS request before on() fails closed
+PASS init runs after on() microtasks
+PASS request handler microtask is ordered before the response is observed
+PASS response event exists
+PASS both timers were posted
+PASS cleared timer does not run when the native timer still fires
+PASS remaining timer runs
+PASS second cancel throws and the host reports one cancellation
+PASS formData never reaches the network
+PASS script http json is parsed and the host saw the body
+PASS private resolution does not call the transport
+PASS preload utf-8 quirk keeps the 3-byte decoder
+PASS preload utf-8 still decodes BMP
+PASS preload md5 encodes then the host decodes
+PASS update alert is once and a short invalid url is kept
+PASS binary response is a Buffer data array of unsigned bytes
+PASS script can rebuild a typed array from the buffer payload
+PASS oversized binary body is rejected
+PASS infinite loop exits 70
+PASS memory limit exits 70
+PASS child watchdog exits 72 while the parent is silent
+PASS live https://example.com returns a public address and the example page
+PASS live redirect to example.com is followed
+PASS kg original parser and port agree on the same captured body
+INFO kg same body original=0 port=0 status=200 bytes=394
+INFO kg both parsers returned no tracks from the same body sha=36a3d4cd6fdcea1c bytes=394 status=200. The empty result is that response, checked with the original parser.
+INFO kg non-original Mozilla user agent is not the port. same parser count=0 status=200. The port keeps the original Chrome 69 header.
+PASS tx original parser and port agree on the same captured body
+INFO tx same body original=10 port=10 status=200 bytes=53363
+PASS mg original parser and port agree on the same captured body
+INFO mg same body original=13 port=13 status=200 bytes=20842
+PASS wy original parser and port agree on the same captured body
+INFO wy same body original=10 port=10 status=200 bytes=34028
+PASS kw original parser and port agree on the same captured body
+INFO kw same body original=5 port=5 status=200 bytes=20132
+PASS mg playlist list matches the original filter on the captured body
+PASS mg playlist songs match the original filter on the captured body
+SUMMARY failed=0

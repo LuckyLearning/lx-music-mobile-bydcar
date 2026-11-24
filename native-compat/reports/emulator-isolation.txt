@@ -1,0 +1,20 @@
+Android instrumentation, 2026-11-24. Not a physical device and not arm64.
+
+API 31 (Android 12) google_apis x86_64 emulator, abi x86_64, port 5554.
+IsolationTest: OK (4 tests). SDK property ro.build.version.sdk=31, ro.product.cpu.abi=x86_64.
+
+API 21 default x86 emulator, abi x86, port 5556.
+IsolationTest: OK (4 tests). ro.build.version.sdk=21, ro.product.cpu.abi=x86.
+
+Tests:
+- service exported=false and FLAG_ISOLATED_PROCESS
+- package cn.toside.music.mobile.nativegate.test
+- isolated eval report 0 / undefined,undefined for fetch and require
+- private app directory not readable from the isolated process
+- stale generation returns 73 and increments droppedLate
+- while(true) returns 70
+- HostBroker ignores a script policy string
+- selfKill drops the binder (DeadObjectException) and the next bind has a different pid
+
+The APK also contains lib/arm64-v8a/liblxgate.so. That library was not loaded. No arm64 emulator or device was available.
+No BYD hardware was used.
